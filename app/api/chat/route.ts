@@ -1,3 +1,4 @@
+import { createGoogle } from "@ai-sdk/google";
 import { openai } from "@ai-sdk/openai";
 import {
   convertToModelMessages,
@@ -18,35 +19,60 @@ import { clientIp, enforceRateLimit } from "@/lib/rate-limit";
 export const maxDuration = 30;
 export const dynamic = "force-dynamic";
 
-const DEFAULT_MODEL = "openai/gpt-5.6-sol";
+const DEFAULT_OPENAI_MODEL = "openai/gpt-5.6-sol";
+const DEFAULT_GOOGLE_MODEL = "google/gemini-2.5-flash";
+
+function googleApiKey() {
+  return (
+    process.env.GOOGLE_GENERATIVE_AI_API_KEY || process.env.GEMINI_API_KEY
+  );
+}
 
 /** True when nothing is configured to talk to a real provider. */
 function isDemoMode() {
   // OIDC is injected by `vercel link` / `vercel pull` even without a model
   // provider. Treat only explicit provider keys as "go live".
-  return !(process.env.OPENAI_API_KEY || process.env.AI_GATEWAY_API_KEY);
+  return !(
+    process.env.OPENAI_API_KEY ||
+    process.env.AI_GATEWAY_API_KEY ||
+    googleApiKey()
+  );
+}
+
+function stripProvider(modelId: string, provider: "openai" | "google") {
+  return modelId.replace(new RegExp(`^${provider}/`), "");
 }
 
 /**
- * Three ways to run, in priority order:
+ * Ways to run, in priority order:
  *
  * 1. `OPENAI_API_KEY` — talk to OpenAI directly.
- * 2. `AI_GATEWAY_API_KEY` / Vercel OIDC — route the plain `provider/model`
- *    string through the Vercel AI Gateway, which handles failover and cost
- *    tracking and lets `CHAT_MODEL` point at any provider without a code change.
- * 3. Neither — fall back to the scripted demo model so the app is still
- *    explorable on a fresh clone.
+ * 2. `GOOGLE_GENERATIVE_AI_API_KEY` / `GEMINI_API_KEY` — Google AI Studio.
+ * 3. `AI_GATEWAY_API_KEY` — route a `provider/model` slug through the Vercel
+ *    AI Gateway.
+ * 4. Neither — scripted demo model so a fresh clone still works.
  */
 function resolveModel() {
   if (isDemoMode()) return demoModel;
 
-  const modelId = process.env.CHAT_MODEL ?? DEFAULT_MODEL;
+  const requested = process.env.CHAT_MODEL;
 
   if (process.env.OPENAI_API_KEY) {
-    return openai(modelId.replace(/^openai\//, ""));
+    const modelId = requested ?? DEFAULT_OPENAI_MODEL;
+    return openai(stripProvider(modelId, "openai"));
   }
 
-  return modelId;
+  if (googleApiKey()) {
+    const modelId =
+      !requested || requested.startsWith("openai/")
+        ? DEFAULT_GOOGLE_MODEL
+        : requested;
+    return createGoogle({ apiKey: googleApiKey() })(
+      stripProvider(modelId, "google"),
+    );
+  }
+
+  return requested ?? DEFAULT_OPENAI_MODEL;
 }
 
 export async function POST(req: Request) {

@@ -77,7 +77,8 @@ npm run db:seed
 To let a real model *choose* the tools (instead of the keyword router):
 
 ```bash
-# add AI_GATEWAY_API_KEY (recommended) or OPENAI_API_KEY
+# Google AI Studio: GOOGLE_GENERATIVE_AI_API_KEY (or GEMINI_API_KEY)
+# or AI_GATEWAY_API_KEY, or OPENAI_API_KEY
 ```
 
 Until that key is set, production stays on the mock model + the warehouse, so
@@ -201,6 +202,10 @@ with no code edit:
 ```bash
 CHAT_MODEL=anthropic/claude-sonnet-4.5
 ```
+
+With a Google AI Studio key, the default model is `google/gemini-2.5-flash`.
+Override with `CHAT_MODEL=google/gemini-2.5-pro` (or another Gemini id) if you
+want a larger model.
 
 ## Scripts
 
