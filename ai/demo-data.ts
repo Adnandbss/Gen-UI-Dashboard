@@ -49,6 +49,52 @@ const KPIS: KpiMetricsInput = {
   ],
 };
 
+const BURN_KPIS: KpiMetricsInput = {
+  metrics: [
+    {
+      title: "Burn Multiple",
+      value: "0.94x",
+      trend: "-0.12x vs. July",
+      isPositive: true,
+    },
+    {
+      title: "Net Burn",
+      value: "$48,000",
+      trend: "Down from $62k in July",
+      isPositive: true,
+    },
+    {
+      title: "Runway",
+      value: "19 months",
+      trend: "+2 months vs. Q2 close",
+      isPositive: true,
+    },
+  ],
+};
+
+const CHURN_KPIS: KpiMetricsInput = {
+  metrics: [
+    {
+      title: "Gross logo churn",
+      value: "1.8%",
+      trend: "-0.4 pts vs. July",
+      isPositive: true,
+    },
+    {
+      title: "Net revenue retention",
+      value: "114%",
+      trend: "+3 pts vs. Q2",
+      isPositive: true,
+    },
+    {
+      title: "At-risk ARR",
+      value: "$86,400",
+      trend: "3 enterprise accounts in the 60-day bucket",
+      isPositive: false,
+    },
+  ],
+};
+
 const ALL_TRANSACTIONS: TransactionsListInput = {
   title: "Recent Transactions",
   transactions: [
@@ -152,6 +198,15 @@ const isConceptual = (text: string) =>
 export function planDemoResponse(userText: string): DemoPlan {
   const text = userText.toLowerCase();
 
+  if (matches(text, /settings|configure|workspace/)) {
+    return {
+      intro:
+        "This is a demo workspace — there are no live integrations to configure. Ask for a dashboard, a revenue trend, or recent transactions and I will render them as UI.",
+      toolCalls: [],
+      closing: "",
+    };
+  }
+
   if (isConceptual(text)) {
     const entry = GLOSSARY.find((g) => g.pattern.test(text));
     if (entry) {
@@ -159,16 +214,28 @@ export function planDemoResponse(userText: string): DemoPlan {
     }
   }
 
+  if (matches(text, /churn/)) {
+    return {
+      intro: "Pulling segment churn now.",
+      toolCalls: [{ toolName: "show_kpi_metrics", input: CHURN_KPIS }],
+      closing:
+        "Logo churn is improving, but the three at-risk enterprise accounts are the real story — if even one of them slips, August NRR drops back through 110%. Expansion in mid-market is what is currently covering it.",
+    };
+  }
+
+  const wantsBurnDeepDive = matches(text, /burn multiple|runway|net burn/);
   const wantsEverything = matches(
     text,
-    /dashboard|everything|full picture|overview of everything|brief me|walk me through/,
+    /dashboard|everything|full picture|overview of everything|brief me|board pack/,
   );
   const wantsKpis =
     wantsEverything ||
+    wantsBurnDeepDive ||
     matches(text, /kpi|metric|summar|overview|how are we|health|snapshot|performance/);
   const wantsChart =
     wantsEverything ||
-    matches(text, /revenue|expense|chart|trend|growth|burn|margin|month|compare|quarter/);
+    wantsBurnDeepDive ||
+    matches(text, /revenue|expense|chart|trend|growth|burn|margin|month|compare|quarter|walk me through/);
   const wantsTransactions =
     wantsEverything ||
     matches(text, /transaction|payment|spend|ledger|recent|activity|pending|invoice|charge/);
@@ -185,7 +252,11 @@ export function planDemoResponse(userText: string): DemoPlan {
     : ALL_TRANSACTIONS;
 
   const toolCalls: DemoToolCall[] = [];
-  if (wantsKpis) toolCalls.push({ toolName: "show_kpi_metrics", input: KPIS });
+  if (wantsKpis)
+    toolCalls.push({
+      toolName: "show_kpi_metrics",
+      input: wantsBurnDeepDive && !wantsEverything ? BURN_KPIS : KPIS,
+    });
   if (wantsChart)
     toolCalls.push({ toolName: "show_revenue_chart", input: REVENUE });
   if (wantsTransactions)

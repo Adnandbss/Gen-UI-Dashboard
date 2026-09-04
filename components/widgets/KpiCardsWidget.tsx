@@ -9,9 +9,9 @@ import { cn } from "@/lib/utils";
 export function KpiCardsWidget({ metrics }: KpiMetricsInput) {
   return (
     <div className="grid w-full gap-3 sm:grid-cols-2 lg:grid-cols-3">
-      {metrics.map((metric) => (
+      {metrics.map((metric, index) => (
         <Card
-          key={metric.title}
+          key={`${metric.title}-${index}`}
           className="group relative gap-0 overflow-hidden py-5 transition-colors hover:border-[var(--brand)]/40"
         >
           {/* Subtle accent bar that picks up the metric's direction. */}

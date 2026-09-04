@@ -13,6 +13,7 @@ import { chatTools } from "@/ai/tools";
 import type { ChatMessage } from "@/ai/types";
 
 export const maxDuration = 30;
+export const dynamic = "force-dynamic";
 
 const DEFAULT_MODEL = "openai/gpt-5.6-sol";
 
@@ -48,7 +49,22 @@ function resolveModel() {
 }
 
 export async function POST(req: Request) {
-  const { messages }: { messages: ChatMessage[] } = await req.json();
+  let body: unknown;
+
+  try {
+    body = await req.json();
+  } catch {
+    return Response.json({ error: "Request body must be JSON." }, { status: 400 });
+  }
+
+  const messages = (body as { messages?: ChatMessage[] }).messages;
+
+  if (!Array.isArray(messages)) {
+    return Response.json(
+      { error: "Expected a { messages } array." },
+      { status: 400 },
+    );
+  }
 
   const result = streamText({
     model: resolveModel(),

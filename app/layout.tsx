@@ -13,10 +13,34 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+const title = "Ledger — Generative Financial Dashboard";
+const description =
+  "A zero-static financial dashboard: every chart, table and scorecard is generated on demand by an LLM calling typed UI tools.";
+
+function siteUrl() {
+  if (process.env.VERCEL_PROJECT_PRODUCTION_URL) {
+    return `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`;
+  }
+  if (process.env.VERCEL_URL) {
+    return `https://${process.env.VERCEL_URL}`;
+  }
+  return "http://localhost:3000";
+}
+
 export const metadata: Metadata = {
-  title: "Ledger — Generative Financial Dashboard",
-  description:
-    "A zero-static financial dashboard: every chart, table and scorecard is generated on demand by an LLM calling typed UI tools.",
+  metadataBase: new URL(siteUrl()),
+  title,
+  description,
+  openGraph: {
+    title,
+    description,
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title,
+    description,
+  },
 };
 
 export const viewport: Viewport = {

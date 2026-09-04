@@ -1,109 +1,22 @@
 "use client";
 
 import { useChat } from "@ai-sdk/react";
-import { AlertTriangle, Menu, PanelLeftClose, Plus, Sparkles } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { Menu, PanelLeftClose, Plus, RotateCcw, Sparkles } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import type { ChatMessage } from "@/ai/types";
 import { Composer } from "@/components/chat/Composer";
 import { EmptyState } from "@/components/chat/EmptyState";
+import { FollowUps } from "@/components/chat/FollowUps";
+import { MessageParts, ToolError } from "@/components/chat/MessageParts";
 import { Sidebar } from "@/components/chat/Sidebar";
 import { Button } from "@/components/ui/button";
-import { KpiCardsWidget } from "@/components/widgets/KpiCardsWidget";
-import { RevenueChartWidget } from "@/components/widgets/RevenueChartWidget";
-import { TransactionsGridWidget } from "@/components/widgets/TransactionsGridWidget";
-import {
-  KpiCardsSkeleton,
-  RevenueChartSkeleton,
-  TransactionsSkeleton,
-} from "@/components/widgets/widget-skeletons";
+import { followUpsFor, lastUserText } from "@/lib/prompts";
 import { cn } from "@/lib/utils";
-
-type MessagePart = ChatMessage["parts"][number];
-
-function ToolError({ message }: { message: string }) {
-  return (
-    <div className="text-destructive bg-destructive/8 border-destructive/25 flex items-start gap-2.5 rounded-xl border p-3.5 text-sm">
-      <AlertTriangle className="mt-0.5 size-4 shrink-0" />
-      <span>{message}</span>
-    </div>
-  );
-}
-
-/**
- * The heart of the app: a message part becomes either prose or a rendered
- * widget. Tool inputs are *never* shown as JSON — while the model is still
- * streaming a tool's arguments we show the matching skeleton, and the moment the
- * input is complete we swap in the real component.
- */
-function renderPart(part: MessagePart, key: string) {
-  switch (part.type) {
-    case "text":
-      return (
-        <p key={key} className="text-[15px] leading-relaxed whitespace-pre-wrap">
-          {part.text}
-        </p>
-      );
-
-    case "tool-show_revenue_chart":
-      switch (part.state) {
-        case "input-streaming":
-          return <RevenueChartSkeleton key={key} />;
-        case "input-available":
-        case "output-available":
-          return (
-            <div key={key} className="animate-rise">
-              <RevenueChartWidget {...part.input} />
-            </div>
-          );
-        case "output-error":
-          return <ToolError key={key} message={part.errorText} />;
-        default:
-          return null;
-      }
-
-    case "tool-show_transactions_list":
-      switch (part.state) {
-        case "input-streaming":
-          return <TransactionsSkeleton key={key} />;
-        case "input-available":
-        case "output-available":
-          return (
-            <div key={key} className="animate-rise">
-              <TransactionsGridWidget {...part.input} />
-            </div>
-          );
-        case "output-error":
-          return <ToolError key={key} message={part.errorText} />;
-        default:
-          return null;
-      }
-
-    case "tool-show_kpi_metrics":
-      switch (part.state) {
-        case "input-streaming":
-          return <KpiCardsSkeleton key={key} />;
-        case "input-available":
-        case "output-available":
-          return (
-            <div key={key} className="animate-rise">
-              <KpiCardsWidget {...part.input} />
-            </div>
-          );
-        case "output-error":
-          return <ToolError key={key} message={part.errorText} />;
-        default:
-          return null;
-      }
-
-    default:
-      return null;
-  }
-}
 
 function ThinkingIndicator() {
   return (
-    <div className="text-muted-foreground flex items-center gap-2 text-sm">
+    <div className="text-muted-foreground flex items-center gap-2 text-sm" aria-live="polite">
       {[0, 1, 2].map((i) => (
         <span
           key={i}
@@ -120,8 +33,10 @@ export default function Page() {
   const [input, setInput] = useState("");
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [demoMode, setDemoMode] = useState(false);
+  const [activeNav, setActiveNav] = useState("Overview");
+  const stickToBottom = useRef(true);
 
-  const { messages, sendMessage, status, stop, setMessages, error } =
+  const { messages, sendMessage, status, stop, setMessages, error, regenerate } =
     useChat<ChatMessage>();
 
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -136,29 +51,56 @@ export default function Page() {
       .catch(() => setDemoMode(false));
   }, []);
 
-  // Follow the conversation as it grows. `smooth` on every token would fight the
-  // user's own scrolling, so this only fires when the message list changes.
   useEffect(() => {
+    if (!stickToBottom.current) return;
     bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
-  }, [messages.length, status]);
+  }, [messages, status]);
 
-  const submit = (text: string) => {
-    const trimmed = text.trim();
-    if (!trimmed || isStreaming) return;
-    sendMessage({ text: trimmed });
-    setInput("");
-  };
+  useEffect(() => {
+    if (!sidebarOpen) return;
+
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setSidebarOpen(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [sidebarOpen]);
+
+  const submit = useCallback(
+    (text: string, navLabel?: string) => {
+      const trimmed = text.trim();
+      if (!trimmed || isStreaming) return;
+      if (navLabel) setActiveNav(navLabel);
+      stickToBottom.current = true;
+      sendMessage({ text: trimmed });
+      setInput("");
+      setSidebarOpen(false);
+    },
+    [isStreaming, sendMessage],
+  );
 
   const lastMessage = messages.at(-1);
   const showThinking =
     isStreaming &&
     (lastMessage?.role === "user" || lastMessage?.parts.length === 0);
+  const showFollowUps =
+    !isStreaming && lastMessage?.role === "assistant" && !error;
 
   return (
     <div className="bg-background flex h-dvh overflow-hidden">
-      <Sidebar className="hidden lg:flex" />
+      <a
+        href="#composer"
+        className="bg-background sr-only focus:not-sr-only focus:absolute focus:z-50 focus:m-3 focus:rounded-md focus:px-3 focus:py-2 focus:text-sm"
+      >
+        Skip to message input
+      </a>
 
-      {/* Mobile drawer */}
+      <Sidebar
+        className="hidden lg:flex"
+        activeLabel={activeNav}
+        onSelect={submit}
+      />
+
       <div
         className={cn(
           "fixed inset-0 z-50 lg:hidden",
@@ -178,6 +120,8 @@ export default function Page() {
             "bg-card absolute inset-y-0 left-0 transition-transform duration-300",
             sidebarOpen ? "translate-x-0" : "-translate-x-full",
           )}
+          activeLabel={activeNav}
+          onSelect={submit}
         />
         <Button
           variant="ghost"
@@ -201,6 +145,7 @@ export default function Page() {
             className="lg:hidden"
             onClick={() => setSidebarOpen(true)}
             aria-label="Open menu"
+            aria-expanded={sidebarOpen}
           >
             <Menu className="size-5" />
           </Button>
@@ -231,6 +176,7 @@ export default function Page() {
               stop();
               setMessages([]);
               setInput("");
+              setActiveNav("Overview");
             }}
             disabled={messages.length === 0}
           >
@@ -242,11 +188,20 @@ export default function Page() {
         <div
           ref={scrollRef}
           className="scrollbar-subtle flex-1 overflow-y-auto scroll-smooth"
+          onScroll={(event) => {
+            const el = event.currentTarget;
+            const remaining = el.scrollHeight - el.scrollTop - el.clientHeight;
+            stickToBottom.current = remaining < 80;
+          }}
         >
           {messages.length === 0 ? (
-            <EmptyState onSelect={submit} />
+            <EmptyState onSelect={submit} demoMode={demoMode} />
           ) : (
-            <div className="mx-auto w-full max-w-3xl space-y-6 px-4 py-6">
+            <div
+              className="mx-auto w-full max-w-3xl space-y-6 px-4 py-6"
+              aria-live="polite"
+              aria-relevant="additions"
+            >
               {messages.map((message) =>
                 message.role === "user" ? (
                   <div key={message.id} className="flex justify-end">
@@ -266,9 +221,7 @@ export default function Page() {
                       <Sparkles className="size-3.5 text-[var(--brand)]" />
                     </span>
                     <div className="min-w-0 flex-1 space-y-4">
-                      {message.parts.map((part, index) =>
-                        renderPart(part, `${message.id}-${index}`),
-                      )}
+                      <MessageParts parts={message.parts} messageId={message.id} />
                     </div>
                   </div>
                 ),
@@ -287,8 +240,29 @@ export default function Page() {
               )}
 
               {error && (
-                <ToolError
-                  message={`${error.message} — check that a provider key is set in .env.local, or remove it to use demo mode.`}
+                <div className="space-y-3">
+                  <ToolError
+                    message={
+                      demoMode
+                        ? error.message
+                        : `${error.message} Check the provider key in .env.local, or remove it to fall back to demo mode.`
+                    }
+                  />
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => regenerate()}
+                  >
+                    <RotateCcw className="size-3.5" />
+                    Retry
+                  </Button>
+                </div>
+              )}
+
+              {showFollowUps && (
+                <FollowUps
+                  chips={followUpsFor(lastUserText(messages))}
+                  onSelect={submit}
                 />
               )}
 

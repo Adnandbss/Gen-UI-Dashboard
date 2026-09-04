@@ -10,10 +10,11 @@ import {
   Wallet,
 } from "lucide-react";
 
+import { NAV_PROMPTS, SIDEBAR_RECENTS } from "@/lib/prompts";
 import { cn } from "@/lib/utils";
 
 const NAV_ITEMS = [
-  { label: "Overview", icon: LayoutDashboard, active: true },
+  { label: "Overview", icon: LayoutDashboard },
   { label: "Revenue", icon: ChartNoAxesCombined },
   { label: "Transactions", icon: ArrowLeftRight },
   { label: "Accounts", icon: Wallet },
@@ -21,13 +22,15 @@ const NAV_ITEMS = [
   { label: "Settings", icon: Settings },
 ] as const;
 
-const RECENT = [
-  "Q3 board pack",
-  "Burn multiple deep dive",
-  "Churn by segment",
-] as const;
-
-export function Sidebar({ className }: { className?: string }) {
+export function Sidebar({
+  className,
+  activeLabel = "Overview",
+  onSelect,
+}: {
+  className?: string;
+  activeLabel?: string;
+  onSelect?: (prompt: string, label?: string) => void;
+}) {
   return (
     <aside
       className={cn(
@@ -45,24 +48,29 @@ export function Sidebar({ className }: { className?: string }) {
         </div>
       </div>
 
-      <nav className="flex-1 space-y-6 overflow-y-auto px-3 py-4">
+      <nav className="flex-1 space-y-6 overflow-y-auto px-3 py-4" aria-label="Workspace">
         <div className="space-y-0.5">
-          {NAV_ITEMS.map(({ label, icon: Icon, ...item }) => (
-            <button
-              key={label}
-              type="button"
-              aria-current={"active" in item && item.active ? "page" : undefined}
-              className={cn(
-                "flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors",
-                "active" in item && item.active
-                  ? "bg-accent text-accent-foreground font-medium"
-                  : "text-muted-foreground hover:bg-accent/60 hover:text-foreground",
-              )}
-            >
-              <Icon className="size-4 shrink-0" />
-              {label}
-            </button>
-          ))}
+          {NAV_ITEMS.map(({ label, icon: Icon }) => {
+            const active = label === activeLabel;
+            const prompt = NAV_PROMPTS[label];
+            return (
+              <button
+                key={label}
+                type="button"
+                aria-current={active ? "page" : undefined}
+                onClick={() => prompt && onSelect?.(prompt, label)}
+                className={cn(
+                  "flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors",
+                  active
+                    ? "bg-accent text-accent-foreground font-medium"
+                    : "text-muted-foreground hover:bg-accent/60 hover:text-foreground",
+                )}
+              >
+                <Icon className="size-4 shrink-0" />
+                {label}
+              </button>
+            );
+          })}
         </div>
 
         <div>
@@ -70,13 +78,14 @@ export function Sidebar({ className }: { className?: string }) {
             Recent
           </p>
           <div className="space-y-0.5">
-            {RECENT.map((item) => (
+            {SIDEBAR_RECENTS.map((item) => (
               <button
-                key={item}
+                key={item.label}
                 type="button"
+                onClick={() => onSelect?.(item.prompt, "Overview")}
                 className="text-muted-foreground hover:bg-accent/60 hover:text-foreground block w-full truncate rounded-lg px-3 py-1.5 text-left text-sm transition-colors"
               >
-                {item}
+                {item.label}
               </button>
             ))}
           </div>

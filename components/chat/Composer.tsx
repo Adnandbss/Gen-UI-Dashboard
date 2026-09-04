@@ -61,6 +61,7 @@ export function Composer({
               }
             }}
             placeholder="Ask anything about your financials…"
+            autoComplete="off"
             className="scrollbar-subtle placeholder:text-muted-foreground max-h-42 flex-1 resize-none bg-transparent px-2 py-2 text-sm outline-none"
           />
 

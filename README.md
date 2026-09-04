@@ -54,8 +54,10 @@ npm install
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000). That's it — no keys required
-for the first run.
+Open **http://localhost:3000** — not the Network IP Next prints. Next 16
+blocks JS on LAN origins unless the host is allowlisted; `next.config.ts`
+already allowlists this machine's private addresses, but `localhost` is the
+reliable URL.
 
 To let a real model drive the widgets:
 
@@ -73,8 +75,9 @@ message stream, the skeleton states) behaves exactly as it does in production;
 only the source of the tokens changes.
 
 This means you can clone the repo and immediately see the whole experience, and it
-makes the streaming states easy to develop against without burning tokens. The
-header shows a **Demo mode** badge whenever it's active.
+The header shows a **Demo mode** badge whenever it's active. Try the sidebar
+entries too — Overview, Revenue, Transactions, and the Recent items all fire
+real prompts rather than sitting as decoration.
 
 ## The three tools
 
