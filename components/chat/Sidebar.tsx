@@ -9,8 +9,9 @@ import {
   Sparkles,
   Wallet,
 } from "lucide-react";
+import Link from "next/link";
 
-import { NAV_PROMPTS, SIDEBAR_RECENTS } from "@/lib/prompts";
+import { NAV_PROMPTS } from "@/lib/prompts";
 import { cn } from "@/lib/utils";
 
 const NAV_ITEMS = [
@@ -22,14 +23,25 @@ const NAV_ITEMS = [
   { label: "Settings", icon: Settings },
 ] as const;
 
+export type RecentChat = {
+  id: string;
+  title: string;
+};
+
 export function Sidebar({
   className,
   activeLabel = "Overview",
+  currentChatId,
+  recents = [],
   onSelect,
+  onClose,
 }: {
   className?: string;
   activeLabel?: string;
+  currentChatId?: string;
+  recents?: RecentChat[];
   onSelect?: (prompt: string, label?: string) => void;
+  onClose?: () => void;
 }) {
   return (
     <aside
@@ -78,16 +90,31 @@ export function Sidebar({
             Recent
           </p>
           <div className="space-y-0.5">
-            {SIDEBAR_RECENTS.map((item) => (
-              <button
-                key={item.label}
-                type="button"
-                onClick={() => onSelect?.(item.prompt, "Overview")}
-                className="text-muted-foreground hover:bg-accent/60 hover:text-foreground block w-full truncate rounded-lg px-3 py-1.5 text-left text-sm transition-colors"
-              >
-                {item.label}
-              </button>
-            ))}
+            {recents.length === 0 ? (
+              <p className="text-muted-foreground px-3 py-1.5 text-sm">
+                No saved threads yet
+              </p>
+            ) : (
+              recents.map((chat) => {
+                const active = chat.id === currentChatId;
+                return (
+                  <Link
+                    key={chat.id}
+                    href={`/c/${chat.id}`}
+                    onClick={onClose}
+                    aria-current={active ? "page" : undefined}
+                    className={cn(
+                      "block w-full truncate rounded-lg px-3 py-1.5 text-left text-sm transition-colors",
+                      active
+                        ? "bg-accent text-accent-foreground font-medium"
+                        : "text-muted-foreground hover:bg-accent/60 hover:text-foreground",
+                    )}
+                  >
+                    {chat.title}
+                  </Link>
+                );
+              })
+            )}
           </div>
         </div>
       </nav>

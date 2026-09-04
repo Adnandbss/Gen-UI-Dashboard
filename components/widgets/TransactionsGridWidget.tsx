@@ -33,7 +33,8 @@ function StatusPill({ status }: { status: Transaction["status"] }) {
 export function TransactionsGridWidget({
   transactions,
   title = "Recent Transactions",
-}: TransactionsListInput) {
+  onAsk,
+}: TransactionsListInput & { onAsk?: (prompt: string) => void }) {
   const netFlow = transactions.reduce((sum, t) => sum + t.amount, 0);
 
   return (
@@ -96,7 +97,22 @@ export function TransactionsGridWidget({
                 return (
                   <tr
                     key={transaction.id}
-                    className="hover:bg-accent/50 transition-colors"
+                    role={onAsk ? "button" : undefined}
+                    tabIndex={onAsk ? 0 : undefined}
+                    onClick={() =>
+                      onAsk?.(`Explain transaction ${transaction.id}.`)
+                    }
+                    onKeyDown={(event) => {
+                      if (!onAsk) return;
+                      if (event.key === "Enter" || event.key === " ") {
+                        event.preventDefault();
+                        onAsk(`Explain transaction ${transaction.id}.`);
+                      }
+                    }}
+                    className={cn(
+                      "hover:bg-accent/50 transition-colors",
+                      onAsk && "cursor-pointer",
+                    )}
                   >
                     <td className="text-muted-foreground tabular py-3.5 pr-3 pl-6 whitespace-nowrap">
                       {formatDate(transaction.date)}

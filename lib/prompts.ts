@@ -22,21 +22,6 @@ export const STARTER_PROMPTS: PromptChip[] = [
   },
 ];
 
-export const SIDEBAR_RECENTS: PromptChip[] = [
-  {
-    label: "Q3 board pack",
-    prompt: "Give me the full dashboard for August.",
-  },
-  {
-    label: "Burn multiple deep dive",
-    prompt: "Walk me through the burn multiple and how it moved with revenue.",
-  },
-  {
-    label: "Churn by segment",
-    prompt: "How is churn looking by segment?",
-  },
-];
-
 export const NAV_PROMPTS: Record<string, string> = {
   Overview: "Give me the full dashboard for August.",
   Revenue: "How did revenue trend against expenses over the last 6 months?",
@@ -53,6 +38,19 @@ export const NAV_PROMPTS: Record<string, string> = {
  */
 export function followUpsFor(userText: string): PromptChip[] {
   const text = userText.toLowerCase();
+
+  if (/runway|cash on hand/.test(text)) {
+    return [
+      {
+        label: "12-month runway",
+        prompt: "Show cash runway for the last 12 months.",
+      },
+      {
+        label: "Full dashboard",
+        prompt: "Give me the full dashboard for August.",
+      },
+    ];
+  }
 
   if (/pending|outstanding|unsettled/.test(text)) {
     return [

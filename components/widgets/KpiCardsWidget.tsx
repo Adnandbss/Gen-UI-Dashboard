@@ -6,13 +6,30 @@ import type { KpiMetricsInput } from "@/ai/schemas";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 
-export function KpiCardsWidget({ metrics }: KpiMetricsInput) {
+export function KpiCardsWidget({
+  metrics,
+  onAsk,
+}: KpiMetricsInput & { onAsk?: (prompt: string) => void }) {
   return (
     <div className="grid w-full gap-3 sm:grid-cols-2 lg:grid-cols-3">
       {metrics.map((metric, index) => (
         <Card
           key={`${metric.title}-${index}`}
-          className="group relative gap-0 overflow-hidden py-5 transition-colors hover:border-[var(--brand)]/40"
+          role={onAsk ? "button" : undefined}
+          tabIndex={onAsk ? 0 : undefined}
+          onClick={() => onAsk?.(`Break down ${metric.title}.`)}
+          onKeyDown={(event) => {
+            if (!onAsk) return;
+            if (event.key === "Enter" || event.key === " ") {
+              event.preventDefault();
+              onAsk(`Break down ${metric.title}.`);
+            }
+          }}
+          aria-label={onAsk ? `Break down ${metric.title}` : undefined}
+          className={cn(
+            "group relative gap-0 overflow-hidden py-5 transition-colors hover:border-[var(--brand)]/40",
+            onAsk && "cursor-pointer",
+          )}
         >
           {/* Subtle accent bar that picks up the metric's direction. */}
           <span

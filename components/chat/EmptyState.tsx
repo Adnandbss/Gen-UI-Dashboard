@@ -40,7 +40,7 @@ export function EmptyState({
       </p>
       {demoMode && (
         <p className="text-muted-foreground mt-2 text-xs">
-          Running in demo mode with scripted data — no API key required.
+          Running in demo mode with the seeded warehouse — no API key required.
         </p>
       )}
 

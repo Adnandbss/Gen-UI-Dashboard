@@ -1,159 +1,21 @@
 import type {
-  KpiMetricsInput,
-  RevenueChartInput,
-  TransactionsListInput,
+  KpiSet,
+  MonthsFilter,
+  RevenueChartFilter,
+  RunwayFilter,
+  TransactionsListFilter,
 } from "./schemas";
-import type { ChatToolName } from "./tools";
 
 /**
- * Scripted responses for demo mode (no API key configured).
- *
- * The figures below describe one coherent fictional SaaS business so that every
- * widget agrees with every other widget — the chart totals, the KPI deltas, and
- * the ledger all reconcile.
+ * Keyword router for demo mode. It only decides *which filters to request*;
+ * `execute` still loads numbers from the warehouse so demo and live cannot drift.
  */
 
-const REVENUE: RevenueChartInput = {
-  title: "Revenue vs. Expenses",
-  subtitle: "Trailing 6 months",
-  data: [
-    { month: "Mar", revenue: 412_000, expenses: 318_000 },
-    { month: "Apr", revenue: 438_000, expenses: 331_000 },
-    { month: "May", revenue: 421_000, expenses: 342_000 },
-    { month: "Jun", revenue: 476_000, expenses: 349_000 },
-    { month: "Jul", revenue: 519_000, expenses: 358_000 },
-    { month: "Aug", revenue: 548_000, expenses: 366_000 },
-  ],
-};
-
-const KPIS: KpiMetricsInput = {
-  metrics: [
-    {
-      title: "Net Revenue",
-      value: "$548,000",
-      trend: "+5.6% vs. July",
-      isPositive: true,
-    },
-    {
-      title: "Gross Margin",
-      value: "66.2%",
-      trend: "+1.8 pts vs. Q2 average",
-      isPositive: true,
-    },
-    {
-      title: "Burn Multiple",
-      value: "0.94x",
-      trend: "-0.12x vs. July",
-      isPositive: true,
-    },
-  ],
-};
-
-const BURN_KPIS: KpiMetricsInput = {
-  metrics: [
-    {
-      title: "Burn Multiple",
-      value: "0.94x",
-      trend: "-0.12x vs. July",
-      isPositive: true,
-    },
-    {
-      title: "Net Burn",
-      value: "$48,000",
-      trend: "Down from $62k in July",
-      isPositive: true,
-    },
-    {
-      title: "Runway",
-      value: "19 months",
-      trend: "+2 months vs. Q2 close",
-      isPositive: true,
-    },
-  ],
-};
-
-const CHURN_KPIS: KpiMetricsInput = {
-  metrics: [
-    {
-      title: "Gross logo churn",
-      value: "1.8%",
-      trend: "-0.4 pts vs. July",
-      isPositive: true,
-    },
-    {
-      title: "Net revenue retention",
-      value: "114%",
-      trend: "+3 pts vs. Q2",
-      isPositive: true,
-    },
-    {
-      title: "At-risk ARR",
-      value: "$86,400",
-      trend: "3 enterprise accounts in the 60-day bucket",
-      isPositive: false,
-    },
-  ],
-};
-
-const ALL_TRANSACTIONS: TransactionsListInput = {
-  title: "Recent Transactions",
-  transactions: [
-    {
-      id: "TXN-4092",
-      date: "2026-08-29",
-      description: "Northwind Logistics — Annual license",
-      amount: 84_000,
-      status: "Completed",
-    },
-    {
-      id: "TXN-4088",
-      date: "2026-08-27",
-      description: "AWS — Compute & storage",
-      amount: -31_450.75,
-      status: "Completed",
-    },
-    {
-      id: "TXN-4081",
-      date: "2026-08-24",
-      description: "Meridian Health — Platform expansion",
-      amount: 47_500,
-      status: "Pending",
-    },
-    {
-      id: "TXN-4076",
-      date: "2026-08-21",
-      description: "Payroll — August cycle",
-      amount: -186_200,
-      status: "Completed",
-    },
-    {
-      id: "TXN-4070",
-      date: "2026-08-18",
-      description: "Atlas Retail Group — Seat true-up",
-      amount: 22_800,
-      status: "Completed",
-    },
-    {
-      id: "TXN-4063",
-      date: "2026-08-15",
-      description: "Quarterly SOC 2 audit — Vantage LLP",
-      amount: -18_000,
-      status: "Pending",
-    },
-    {
-      id: "TXN-4059",
-      date: "2026-08-12",
-      description: "Helios Manufacturing — Renewal",
-      amount: 61_250,
-      status: "Completed",
-    },
-  ],
-};
-
-export type DemoToolCall = {
-  toolName: ChatToolName;
-  input: unknown;
-};
+export type DemoToolCall =
+  | { toolName: "show_revenue_chart"; input: RevenueChartFilter }
+  | { toolName: "show_transactions_list"; input: TransactionsListFilter }
+  | { toolName: "show_kpi_metrics"; input: { kpiSet: KpiSet } }
+  | { toolName: "show_runway"; input: RunwayFilter };
 
 export type DemoPlan = {
   intro: string;
@@ -163,11 +25,6 @@ export type DemoPlan = {
 
 const matches = (text: string, pattern: RegExp) => pattern.test(text);
 
-/**
- * Conceptual questions deserve a sentence, not a chart. Without this the
- * keyword router would see "burn" in "what is a burn multiple?" and render the
- * revenue chart at someone asking for a definition.
- */
 const GLOSSARY: { pattern: RegExp; answer: string }[] = [
   {
     pattern: /burn multiple/,
@@ -188,7 +45,17 @@ const GLOSSARY: { pattern: RegExp; answer: string }[] = [
 
 const isConceptual = (text: string) =>
   matches(text, /^\s*(what|what's|whats|why|how)\b/) &&
-  !matches(text, /show|give|render|display|pull up|chart|dashboard|list/);
+  !matches(text, /show|give|render|display|pull up|chart|dashboard|list|break down|explain/);
+
+export function parseMonths(text: string): MonthsFilter {
+  if (/last 12 months|trailing 12|past year|12 months/.test(text)) return 12;
+  if (/last 3 months|trailing 3|past quarter|3 months/.test(text)) return 3;
+  return 6;
+}
+
+function parseTxnId(text: string) {
+  return text.match(/txn-[\w-]+/i)?.[0]?.toUpperCase();
+}
 
 /**
  * Picks which widgets to render from the user's message. This is intentionally a
@@ -197,6 +64,7 @@ const isConceptual = (text: string) =>
  */
 export function planDemoResponse(userText: string): DemoPlan {
   const text = userText.toLowerCase();
+  const months = parseMonths(text);
 
   if (matches(text, /settings|configure|workspace/)) {
     return {
@@ -214,16 +82,60 @@ export function planDemoResponse(userText: string): DemoPlan {
     }
   }
 
+  const txnId = parseTxnId(text);
+  if (txnId && matches(text, /explain|transaction/)) {
+    return {
+      intro: `Looking up ${txnId}.`,
+      toolCalls: [
+        {
+          toolName: "show_transactions_list",
+          input: { status: "all", id: txnId },
+        },
+      ],
+      closing:
+        "This is the named ledger line — click another row if you want the same treatment for a different payment.",
+    };
+  }
+
+  if (matches(text, /break down/)) {
+    if (matches(text, /churn|retention|at-risk/)) {
+      return {
+        intro: "Pulling the churn scorecard.",
+        toolCalls: [{ toolName: "show_kpi_metrics", input: { kpiSet: "churn" } }],
+        closing:
+          "Logo churn is improving, but the three at-risk enterprise accounts are the real story.",
+      };
+    }
+    if (matches(text, /burn|runway/)) {
+      return {
+        intro: "Breaking down burn and runway.",
+        toolCalls: [
+          { toolName: "show_kpi_metrics", input: { kpiSet: "burn" } },
+          { toolName: "show_runway", input: { months } },
+        ],
+        closing:
+          "Net burn dropped in August, which is what stretched runway — not a one-off cash injection.",
+      };
+    }
+    return {
+      intro: "Breaking that metric into the trend underneath it.",
+      toolCalls: [{ toolName: "show_revenue_chart", input: { months } }],
+      closing:
+        "August is the high-water mark; the gap versus expenses is operating leverage, not a one-off invoice.",
+    };
+  }
+
   if (matches(text, /churn/)) {
     return {
       intro: "Pulling segment churn now.",
-      toolCalls: [{ toolName: "show_kpi_metrics", input: CHURN_KPIS }],
+      toolCalls: [{ toolName: "show_kpi_metrics", input: { kpiSet: "churn" } }],
       closing:
         "Logo churn is improving, but the three at-risk enterprise accounts are the real story — if even one of them slips, August NRR drops back through 110%. Expansion in mid-market is what is currently covering it.",
     };
   }
 
-  const wantsBurnDeepDive = matches(text, /burn multiple|runway|net burn/);
+  const wantsRunway = matches(text, /runway|cash on hand|months of cash/);
+  const wantsBurnDeepDive = matches(text, /burn multiple|net burn/);
   const wantsEverything = matches(
     text,
     /dashboard|everything|full picture|overview of everything|brief me|board pack/,
@@ -242,32 +154,35 @@ export function planDemoResponse(userText: string): DemoPlan {
 
   const pendingOnly = matches(text, /pending|outstanding|unsettled|awaiting/);
 
-  const transactions: TransactionsListInput = pendingOnly
-    ? {
-        title: "Pending Transactions",
-        transactions: ALL_TRANSACTIONS.transactions.filter(
-          (t) => t.status === "Pending",
-        ),
-      }
-    : ALL_TRANSACTIONS;
-
   const toolCalls: DemoToolCall[] = [];
-  if (wantsKpis)
+  if (wantsKpis) {
     toolCalls.push({
       toolName: "show_kpi_metrics",
-      input: wantsBurnDeepDive && !wantsEverything ? BURN_KPIS : KPIS,
+      input: {
+        kpiSet: wantsBurnDeepDive && !wantsEverything ? "burn" : "overview",
+      },
     });
-  if (wantsChart)
-    toolCalls.push({ toolName: "show_revenue_chart", input: REVENUE });
-  if (wantsTransactions)
-    toolCalls.push({ toolName: "show_transactions_list", input: transactions });
+  }
+  if (wantsRunway) {
+    toolCalls.push({ toolName: "show_runway", input: { months } });
+  }
+  if (wantsChart && !wantsRunway) {
+    toolCalls.push({ toolName: "show_revenue_chart", input: { months } });
+  }
+  if (wantsChart && wantsRunway && wantsBurnDeepDive) {
+    toolCalls.push({ toolName: "show_revenue_chart", input: { months } });
+  }
+  if (wantsTransactions) {
+    toolCalls.push({
+      toolName: "show_transactions_list",
+      input: { status: pendingOnly ? "Pending" : "all" },
+    });
+  }
 
-  // Nothing matched: show the headline scorecard and the trend, which answers
-  // most open-ended questions about the business.
   if (toolCalls.length === 0) {
     toolCalls.push(
-      { toolName: "show_kpi_metrics", input: KPIS },
-      { toolName: "show_revenue_chart", input: REVENUE },
+      { toolName: "show_kpi_metrics", input: { kpiSet: "overview" } },
+      { toolName: "show_revenue_chart", input: { months } },
     );
   }
 
@@ -290,6 +205,11 @@ function buildClosing(toolCalls: DemoToolCall[], pendingOnly: boolean): string {
   if (rendered.has("show_revenue_chart")) {
     notes.push(
       "Revenue is up 33% since March while expenses grew only 15%, so the widening gap is operating leverage rather than one-off timing.",
+    );
+  }
+  if (rendered.has("show_runway")) {
+    notes.push(
+      "Cash is still declining, but slower — August burn is what stretched runway, not a financing event.",
     );
   }
   if (rendered.has("show_transactions_list")) {

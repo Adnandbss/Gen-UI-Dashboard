@@ -12,8 +12,9 @@ import {
   YAxis,
 } from "recharts";
 
-import type { RevenueChartInput } from "@/ai/schemas";
+import type { MonthsFilter, RevenueChartInput } from "@/ai/schemas";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { RangeChips } from "@/components/widgets/RangeChips";
 import { formatCompact, formatCurrency } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
@@ -76,7 +77,8 @@ export function RevenueChartWidget({
   data,
   title = "Revenue vs. Expenses",
   subtitle,
-}: RevenueChartInput) {
+  onAsk,
+}: RevenueChartInput & { onAsk?: (prompt: string) => void }) {
   const totalRevenue = data.reduce((sum, d) => sum + d.revenue, 0);
   const totalExpenses = data.reduce((sum, d) => sum + d.expenses, 0);
   const net = totalRevenue - totalExpenses;
@@ -92,7 +94,19 @@ export function RevenueChartWidget({
             {subtitle ?? `${data.length} ${data.length === 1 ? "period" : "periods"}`}
           </CardDescription>
         </div>
-        <div className="text-right">
+        <div className="flex flex-col items-end gap-2">
+          {onAsk && (
+            <RangeChips
+              activeMonths={
+                data.length === 3 || data.length === 6 || data.length === 12
+                  ? data.length
+                  : undefined
+              }
+              onSelect={(months: MonthsFilter) =>
+                onAsk(`Show revenue vs expenses for the last ${months} months.`)
+              }
+            />
+          )}
           <p className="tabular text-2xl font-semibold tracking-tight">
             {formatCurrency(net)}
           </p>

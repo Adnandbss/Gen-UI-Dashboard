@@ -5,7 +5,7 @@ import type { chatTools } from "./tools";
 /**
  * Type-only module: importing this from a client component costs nothing at
  * runtime, but gives `useChat` full knowledge of every tool part — so
- * `part.input` is strongly typed at each render site instead of `unknown`.
+ * `part.output` is strongly typed at each render site instead of `unknown`.
  */
 export type ChatTools = InferUITools<typeof chatTools>;
 

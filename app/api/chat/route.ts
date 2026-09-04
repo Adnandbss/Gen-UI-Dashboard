@@ -11,6 +11,9 @@ import { demoModel } from "@/ai/demo-model";
 import { SYSTEM_PROMPT } from "@/ai/prompt";
 import { chatTools } from "@/ai/tools";
 import type { ChatMessage } from "@/ai/types";
+import { isChatId } from "@/lib/chat-id";
+import { saveChat } from "@/lib/chat-store";
+import { clientIp, enforceRateLimit } from "@/lib/rate-limit";
 
 export const maxDuration = 30;
 export const dynamic = "force-dynamic";
@@ -47,6 +50,17 @@ function resolveModel() {
 }
 
 export async function POST(req: Request) {
+  const limited = await enforceRateLimit(clientIp(req));
+  if (!limited.ok) {
+    return Response.json(
+      { error: "Too many requests. Try again in a few minutes." },
+      {
+        status: 429,
+        headers: { "Retry-After": String(limited.retryAfter) },
+      },
+    );
+  }
+
   let body: unknown;
 
   try {
@@ -55,13 +69,19 @@ export async function POST(req: Request) {
     return Response.json({ error: "Request body must be JSON." }, { status: 400 });
   }
 
-  const messages = (body as { messages?: ChatMessage[] }).messages;
+  const payload = body as { messages?: ChatMessage[]; id?: string };
+  const messages = payload.messages;
+  const id = typeof payload.id === "string" ? payload.id : "";
 
   if (!Array.isArray(messages)) {
     return Response.json(
       { error: "Expected a { messages } array." },
       { status: 400 },
     );
+  }
+
+  if (!isChatId(id)) {
+    return Response.json({ error: "Invalid chat id." }, { status: 400 });
   }
 
   const result = streamText({
@@ -77,11 +97,17 @@ export async function POST(req: Request) {
   return createUIMessageStreamResponse({
     stream: toUIMessageStream({
       stream: result.stream,
+      originalMessages: messages,
       onError: (error) => {
         console.error("[chat] stream error", error);
         return error instanceof Error
           ? error.message
           : "Something went wrong while generating a response.";
+      },
+      onEnd: async ({ messages: nextMessages }) => {
+        if (nextMessages.some((message) => message.role === "user")) {
+          await saveChat(id, nextMessages);
+        }
       },
     }),
   });

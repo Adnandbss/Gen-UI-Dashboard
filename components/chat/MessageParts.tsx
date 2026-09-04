@@ -8,6 +8,7 @@ import type { ChatMessage } from "@/ai/types";
 import {
   kpiMetricsSchema,
   revenueChartSchema,
+  runwaySchema,
   transactionsListSchema,
 } from "@/ai/schemas";
 import { KpiCardsWidget } from "@/components/widgets/KpiCardsWidget";
@@ -15,6 +16,7 @@ import { TransactionsGridWidget } from "@/components/widgets/TransactionsGridWid
 import {
   KpiCardsSkeleton,
   RevenueChartSkeleton,
+  RunwaySkeleton,
   TransactionsSkeleton,
 } from "@/components/widgets/widget-skeletons";
 
@@ -24,6 +26,12 @@ const RevenueChartWidget = dynamic(
       (mod) => mod.RevenueChartWidget,
     ),
   { ssr: false, loading: () => <RevenueChartSkeleton /> },
+);
+
+const RunwayWidget = dynamic(
+  () =>
+    import("@/components/widgets/RunwayWidget").then((mod) => mod.RunwayWidget),
+  { ssr: false, loading: () => <RunwaySkeleton /> },
 );
 
 type MessagePart = ChatMessage["parts"][number];
@@ -43,13 +51,17 @@ export function ToolError({ message }: { message: string }) {
 export function MessageParts({
   parts,
   messageId,
+  onAsk,
 }: {
   parts: ChatMessage["parts"];
   messageId: string;
+  onAsk?: (prompt: string) => void;
 }) {
   return (
     <>
-      {parts.map((part, index) => renderPart(part, `${messageId}-${index}`))}
+      {parts.map((part, index) =>
+        renderPart(part, `${messageId}-${index}`, onAsk),
+      )}
     </>
   );
 }
@@ -67,8 +79,8 @@ function ToolFrame({
 }) {
   switch (state) {
     case "input-streaming":
-      return skeleton;
     case "input-available":
+      return skeleton;
     case "output-available":
       return widget ? <div className="animate-rise">{widget}</div> : skeleton;
     case "output-error":
@@ -78,7 +90,20 @@ function ToolFrame({
   }
 }
 
-function renderPart(part: MessagePart, key: string) {
+function parseOutput<T>(
+  part: { state: string; output?: unknown },
+  schema: { safeParse: (data: unknown) => { success: true; data: T } | { success: false } },
+) {
+  if (part.state !== "output-available") return null;
+  const parsed = schema.safeParse(part.output);
+  return parsed.success ? parsed.data : null;
+}
+
+function renderPart(
+  part: MessagePart,
+  key: string,
+  onAsk?: (prompt: string) => void,
+) {
   switch (part.type) {
     case "text":
       if (!part.text.trim()) return null;
@@ -95,9 +120,9 @@ function renderPart(part: MessagePart, key: string) {
             state={part.state}
             skeleton={<RevenueChartSkeleton />}
             widget={(() => {
-              const parsed = revenueChartSchema.safeParse(part.input);
-              return parsed.success ? (
-                <RevenueChartWidget {...parsed.data} />
+              const parsed = parseOutput(part, revenueChartSchema);
+              return parsed ? (
+                <RevenueChartWidget {...parsed} onAsk={onAsk} />
               ) : null;
             })()}
             errorText={"errorText" in part ? part.errorText : undefined}
@@ -112,9 +137,9 @@ function renderPart(part: MessagePart, key: string) {
             state={part.state}
             skeleton={<TransactionsSkeleton />}
             widget={(() => {
-              const parsed = transactionsListSchema.safeParse(part.input);
-              return parsed.success ? (
-                <TransactionsGridWidget {...parsed.data} />
+              const parsed = parseOutput(part, transactionsListSchema);
+              return parsed ? (
+                <TransactionsGridWidget {...parsed} onAsk={onAsk} />
               ) : null;
             })()}
             errorText={"errorText" in part ? part.errorText : undefined}
@@ -129,10 +154,23 @@ function renderPart(part: MessagePart, key: string) {
             state={part.state}
             skeleton={<KpiCardsSkeleton />}
             widget={(() => {
-              const parsed = kpiMetricsSchema.safeParse(part.input);
-              return parsed.success ? (
-                <KpiCardsWidget {...parsed.data} />
-              ) : null;
+              const parsed = parseOutput(part, kpiMetricsSchema);
+              return parsed ? <KpiCardsWidget {...parsed} onAsk={onAsk} /> : null;
+            })()}
+            errorText={"errorText" in part ? part.errorText : undefined}
+          />
+        </div>
+      );
+
+    case "tool-show_runway":
+      return (
+        <div key={key}>
+          <ToolFrame
+            state={part.state}
+            skeleton={<RunwaySkeleton />}
+            widget={(() => {
+              const parsed = parseOutput(part, runwaySchema);
+              return parsed ? <RunwayWidget {...parsed} onAsk={onAsk} /> : null;
             })()}
             errorText={"errorText" in part ? part.errorText : undefined}
           />
