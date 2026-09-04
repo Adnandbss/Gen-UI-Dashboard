@@ -19,11 +19,9 @@ const DEFAULT_MODEL = "openai/gpt-5.6-sol";
 
 /** True when nothing is configured to talk to a real provider. */
 function isDemoMode() {
-  return !(
-    process.env.OPENAI_API_KEY ||
-    process.env.AI_GATEWAY_API_KEY ||
-    process.env.VERCEL_OIDC_TOKEN
-  );
+  // OIDC is injected by `vercel link` / `vercel pull` even without a model
+  // provider. Treat only explicit provider keys as "go live".
+  return !(process.env.OPENAI_API_KEY || process.env.AI_GATEWAY_API_KEY);
 }
 
 /**
