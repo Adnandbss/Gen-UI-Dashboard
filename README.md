@@ -9,7 +9,7 @@ scorecard — streamed into the conversation as it decides what you need to see.
 
 The model never returns a markdown table. It returns UI.
 
-**Live demo:** [gen-ui-dashboard.vercel.app](https://gen-ui-dashboard.vercel.app)
+**Live demo:** [gen-ui-dashboard-team-adnan.vercel.app](https://gen-ui-dashboard-team-adnan.vercel.app)
 
 ![The dashboard mid-response: KPI cards have resolved, the revenue chart has just
 finished streaming, and the transactions table is still on its way.](docs/screenshot.png)
