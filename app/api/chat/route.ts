@@ -22,10 +22,12 @@ export const dynamic = "force-dynamic";
 const DEFAULT_OPENAI_MODEL = "openai/gpt-5.6-sol";
 const DEFAULT_GOOGLE_MODEL = "google/gemini-2.5-flash";
 
+function env(name: string) {
+  return process.env[name];
+}
+
 function googleApiKey() {
-  return (
-    process.env.GOOGLE_GENERATIVE_AI_API_KEY || process.env.GEMINI_API_KEY
-  );
+  return env("GOOGLE_GENERATIVE_AI_API_KEY") || env("GEMINI_API_KEY");
 }
 
 /** True when nothing is configured to talk to a real provider. */
@@ -33,8 +35,8 @@ function isDemoMode() {
   // OIDC is injected by `vercel link` / `vercel pull` even without a model
   // provider. Treat only explicit provider keys as "go live".
   return !(
-    process.env.OPENAI_API_KEY ||
-    process.env.AI_GATEWAY_API_KEY ||
+    env("OPENAI_API_KEY") ||
+    env("AI_GATEWAY_API_KEY") ||
     googleApiKey()
   );
 }
@@ -55,9 +57,9 @@ function stripProvider(modelId: string, provider: "openai" | "google") {
 function resolveModel() {
   if (isDemoMode()) return demoModel;
 
-  const requested = process.env.CHAT_MODEL;
+  const requested = env("CHAT_MODEL");
 
-  if (process.env.OPENAI_API_KEY) {
+  if (env("OPENAI_API_KEY")) {
     const modelId = requested ?? DEFAULT_OPENAI_MODEL;
     return openai(stripProvider(modelId, "openai"));
   }
