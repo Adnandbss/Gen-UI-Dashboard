@@ -203,8 +203,8 @@ with no code edit:
 CHAT_MODEL=anthropic/claude-sonnet-4.5
 ```
 
-With a Google AI Studio key, the default model is `google/gemini-2.5-flash`.
-Override with `CHAT_MODEL=google/gemini-2.5-pro` (or another Gemini id) if you
+With a Google AI Studio key, the default model is `google/gemini-3.6-flash`.
+Override with `CHAT_MODEL=google/gemini-3-pro-preview` (or another Gemini id) if you
 want a larger model.
 
 ## Scripts

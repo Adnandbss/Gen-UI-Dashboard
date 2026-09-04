@@ -20,7 +20,7 @@ export const maxDuration = 30;
 export const dynamic = "force-dynamic";
 
 const DEFAULT_OPENAI_MODEL = "openai/gpt-5.6-sol";
-const DEFAULT_GOOGLE_MODEL = "google/gemini-2.5-flash";
+const DEFAULT_GOOGLE_MODEL = "google/gemini-3.6-flash";
 
 function env(name: string) {
   return process.env[name];
