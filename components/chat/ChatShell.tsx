@@ -1,7 +1,7 @@
 "use client";
 
 import { useChat } from "@ai-sdk/react";
-import { Check, Copy, Menu, PanelLeftClose, Plus, RotateCcw, Sparkles } from "lucide-react";
+import { Check, Copy, Files, Menu, PanelLeftClose, Plus, RotateCcw, Sparkles } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 
@@ -12,6 +12,7 @@ import { FollowUps } from "@/components/chat/FollowUps";
 import { MessageParts, ToolError } from "@/components/chat/MessageParts";
 import { Sidebar, type RecentChat } from "@/components/chat/Sidebar";
 import { Button } from "@/components/ui/button";
+import type { KnowledgeSummary } from "@/lib/knowledge/types";
 import { followUpsFor, lastUserText } from "@/lib/prompts";
 import { cn } from "@/lib/utils";
 
@@ -44,6 +45,9 @@ export function ChatShell({
   const [activeNav, setActiveNav] = useState("Overview");
   const [recents, setRecents] = useState<RecentChat[]>([]);
   const [copied, setCopied] = useState(false);
+  const [knowledgeSources, setKnowledgeSources] = useState<KnowledgeSummary[]>(
+    [],
+  );
   const stickToBottom = useRef(true);
   const silentRepairs = useRef(0);
 
@@ -65,6 +69,15 @@ export function ChatShell({
       .catch(() => setRecents([]));
   }, []);
 
+  const refreshKnowledge = useCallback(() => {
+    fetch(`/api/knowledge?chatId=${encodeURIComponent(id)}`)
+      .then((res) => res.json())
+      .then((data: { sources?: KnowledgeSummary[] }) =>
+        setKnowledgeSources(data.sources ?? []),
+      )
+      .catch(() => setKnowledgeSources([]));
+  }, [id]);
+
   useEffect(() => {
     fetch("/api/chat")
       .then((res) => res.json())
@@ -75,6 +88,10 @@ export function ChatShell({
   useEffect(() => {
     refreshRecents();
   }, [refreshRecents]);
+
+  useEffect(() => {
+    refreshKnowledge();
+  }, [refreshKnowledge]);
 
   useEffect(() => {
     if (status === "ready") refreshRecents();
@@ -110,7 +127,7 @@ export function ChatShell({
   );
 
   const requestRepair = useCallback(
-    (stack: string, dataset: "monthly_pl" | "transactions") => {
+    (stack: string, dataset: string) => {
       if (isStreaming || silentRepairs.current >= 2) return;
       silentRepairs.current += 1;
       stickToBottom.current = true;
@@ -133,6 +150,7 @@ export function ChatShell({
   }, []);
 
   const lastMessage = messages.at(-1);
+  const knowledgeMode = knowledgeSources.some((source) => source.kind === "table");
   const showThinking =
     isStreaming &&
     (lastMessage?.role === "user" || lastMessage?.parts.length === 0);
@@ -153,8 +171,10 @@ export function ChatShell({
         activeLabel={activeNav}
         currentChatId={id}
         recents={recents}
+        knowledgeSources={knowledgeSources}
         onSelect={submit}
         onClose={() => setSidebarOpen(false)}
+        onKnowledgeUploaded={refreshKnowledge}
       />
 
       <div
@@ -179,8 +199,10 @@ export function ChatShell({
           activeLabel={activeNav}
           currentChatId={id}
           recents={recents}
+          knowledgeSources={knowledgeSources}
           onSelect={submit}
           onClose={() => setSidebarOpen(false)}
+          onKnowledgeUploaded={refreshKnowledge}
         />
         <Button
           variant="ghost"
@@ -217,6 +239,16 @@ export function ChatShell({
               Widgets are assembled per question — nothing is pre-rendered
             </p>
           </div>
+
+          {knowledgeMode && (
+            <span
+              title="This chat reads your uploaded tables instead of the Acme warehouse."
+              className="hidden items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium sm:inline-flex"
+            >
+              <Files className="size-3 text-[var(--brand)]" />
+              Using your files
+            </span>
+          )}
 
           {demoMode && (
             <span
@@ -256,7 +288,11 @@ export function ChatShell({
           }}
         >
           {messages.length === 0 ? (
-            <EmptyState onSelect={submit} demoMode={demoMode} />
+            <EmptyState
+              onSelect={submit}
+              demoMode={demoMode}
+              knowledgeMode={knowledgeMode}
+            />
           ) : (
             <div
               className="mx-auto w-full max-w-3xl space-y-6 px-4 py-6"

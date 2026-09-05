@@ -8,12 +8,13 @@ import {
   toUIMessageStream,
 } from "ai";
 
-import { demoModel } from "@/ai/demo-model";
-import { SYSTEM_PROMPT } from "@/ai/prompt";
-import { chatTools } from "@/ai/tools";
+import { demoModel, knowledgeDemoModel } from "@/ai/demo-model";
+import { buildSystemPrompt } from "@/ai/prompt";
+import { createChatTools } from "@/ai/tools";
 import type { ChatMessage } from "@/ai/types";
 import { isChatId } from "@/lib/chat-id";
 import { saveChat } from "@/lib/chat-store";
+import { listKnowledge } from "@/lib/knowledge/store";
 import { clientIp, enforceRateLimit } from "@/lib/rate-limit";
 
 export const maxDuration = 60;
@@ -112,11 +113,15 @@ export async function POST(req: Request) {
     return Response.json({ error: "Invalid chat id." }, { status: 400 });
   }
 
+  const catalog = await listKnowledge(id);
+  const knowledgeMode = catalog.some((source) => source.kind === "table");
+  const demo = isDemoMode();
+
   const result = streamText({
-    model: resolveModel(),
-    instructions: SYSTEM_PROMPT,
+    model: demo && knowledgeMode ? knowledgeDemoModel : resolveModel(),
+    instructions: buildSystemPrompt(catalog),
     messages: await convertToModelMessages(messages),
-    tools: chatTools,
+    tools: createChatTools({ chatId: id, knowledgeMode }),
     // Enough steps for the model to render several widgets and then come back
     // with a written read on them.
     stopWhen: isStepCount(4),

@@ -20,9 +20,11 @@ const ICONS: Record<string, LucideIcon> = {
 export function EmptyState({
   onSelect,
   demoMode,
+  knowledgeMode,
 }: {
   onSelect: (prompt: string) => void;
   demoMode?: boolean;
+  knowledgeMode?: boolean;
 }) {
   return (
     <div className="animate-rise mx-auto flex w-full max-w-3xl flex-col items-center px-4 py-16 text-center sm:py-24">
@@ -34,13 +36,15 @@ export function EmptyState({
         What would you like to see?
       </h1>
       <p className="text-muted-foreground mt-2.5 max-w-md text-sm leading-relaxed">
-        Ask a question and the answer arrives as a live interface — charts,
-        ledgers and scorecards assembled on the fly. Nothing here is a static
-        page.
+        {knowledgeMode
+          ? "This chat will chart the tables you uploaded — not the Acme warehouse."
+          : "Ask a question and the answer arrives as a live interface — charts, ledgers and scorecards assembled on the fly. Nothing here is a static page."}
       </p>
       {demoMode && (
         <p className="text-muted-foreground mt-2 text-xs">
-          Running in demo mode with the seeded warehouse — no API key required.
+          {knowledgeMode
+            ? "Demo mode can attach files but cannot generate charts from them until a model key is set."
+            : "Running in demo mode with the seeded warehouse — no API key required."}
         </p>
       )}
 

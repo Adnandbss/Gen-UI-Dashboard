@@ -6,6 +6,7 @@ const nextConfig: NextConfig = {
   // machine's LAN addresses so opening the Network URL still hydrates.
   allowedDevOrigins: localNetworkHosts(),
   transpilePackages: ["@codesandbox/sandpack-react"],
+  serverExternalPackages: ["pdf-parse"],
 };
 
 export default nextConfig;

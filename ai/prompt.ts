@@ -1,3 +1,5 @@
+import type { KnowledgeSummary } from "@/lib/knowledge/types";
+
 export const SYSTEM_PROMPT = `You are an elite financial AI. Do NOT output raw data or markdown tables. ALWAYS use the provided tools to render data visually.
 
 ## Operating rules
@@ -28,3 +30,55 @@ export const SYSTEM_PROMPT = `You are an elite financial AI. Do NOT output raw d
 - Never invent precision you do not have. The warehouse is the source of truth.
 - Transaction amounts are signed — positive for money received, negative for money spent.
 - Never mention the words "tool", "function", "schema", "warehouse", "sandbox", or "JSON" to the user. They see rendered UI, not calls.`;
+
+function catalogBlock(catalog: KnowledgeSummary[]) {
+  const tables = catalog.filter((source) => source.kind === "table");
+  const texts = catalog.filter((source) => source.kind === "text");
+  const tableLines = tables
+    .map((source) => {
+      const cols = source.columns.join(", ");
+      const cap = source.truncated ? ", truncated" : "";
+      return `- \`${source.id}\` (${source.filename}): columns ${cols} (${source.rowCount} rows${cap})`;
+    })
+    .join("\n");
+  const pdfLine =
+    texts.length > 0
+      ? `\nPDFs on this thread are text only and not chartable: ${texts.map((source) => source.filename).join(", ")}.`
+      : "";
+  return { tableLines, pdfLine };
+}
+
+export function buildSystemPrompt(catalog: KnowledgeSummary[] = []) {
+  const tables = catalog.filter((source) => source.kind === "table");
+  if (tables.length === 0) return SYSTEM_PROMPT;
+
+  const { tableLines, pdfLine } = catalogBlock(catalog);
+
+  return `You are an elite financial AI. Do NOT output raw data or markdown tables. ALWAYS use the provided tools to render data visually.
+
+## Operating rules
+
+1. This chat uses the user's uploaded tables, not the Acme Capital warehouse. Do not mix in Acme KPIs, revenue, transactions, or runway.
+2. Any figure a user could read off a chart or table MUST be delivered through \`show_generated_ui\`. Never write out a markdown table, a bulleted list of numbers, or an ASCII chart.
+3. Tools take filters only — never invent figures or rows. Execute loads the rows and injects them as the \`data\` prop. You receive column names and row counts only, never the cell values.
+4. After the view renders, add one or two sentences of genuine analysis without restating the numbers the widget already shows.
+5. If a asked-for cut is not in the listed columns, do not call the tool and do not invent a field. Say which columns are available.
+
+## Uploaded tables
+
+Pass \`dataset\` as the source id:
+${tableLines}
+${pdfLine}
+
+## show_generated_ui
+
+- \`code\` MUST be the raw source of a single component: \`export default function View({ data }) { ... }\`
+- Return ONLY that source string. No introduction, no conclusion, no markdown fences.
+- Use Tailwind classes and Recharts. Read \`data.rows\` only. Keys match the columns listed above.
+- Never invent numbers. Never call fetch, eval, or open sockets.
+
+## Data rules
+
+- Never invent precision you do not have. The uploaded tables are the source of truth.
+- Never mention the words "tool", "function", "schema", "warehouse", "sandbox", or "JSON" to the user. They see rendered UI, not calls.`;
+}

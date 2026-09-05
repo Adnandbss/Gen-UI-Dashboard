@@ -69,3 +69,28 @@ export const rateLimitEvents = pgTable(
   },
   (table) => [index("rate_limit_ip_created_idx").on(table.ipHash, table.createdAt)],
 );
+
+/**
+ * Uploaded CSV/Excel (and PDF text) bound to a chat thread.
+ * Rows are capped; if this table starts holding tens of thousands of cells,
+ * stop stuffing JSON into the model and move to object storage + pgvector.
+ */
+export const knowledgeSources = pgTable(
+  "knowledge_sources",
+  {
+    id: text("id").primaryKey(),
+    chatId: text("chat_id")
+      .notNull()
+      .references(() => chats.id, { onDelete: "cascade" }),
+    filename: text("filename").notNull(),
+    kind: text("kind").notNull(),
+    columns: jsonb("columns").$type<string[]>().notNull(),
+    rows: jsonb("rows").$type<Record<string, string | number | boolean | null>[]>().notNull(),
+    textContent: text("text_content"),
+    truncated: boolean("truncated").notNull().default(false),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [index("knowledge_sources_chat_idx").on(table.chatId)],
+);

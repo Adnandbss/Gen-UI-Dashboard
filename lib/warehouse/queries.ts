@@ -14,6 +14,7 @@ import type {
   VisualOutput,
 } from "@/ai/schemas";
 import { sanitizeGeneratedCode } from "@/lib/generated-ui/sanitize";
+import { getKnowledgeSource } from "@/lib/knowledge/store";
 import { kpis, monthlyPl, transactions } from "@/db/schema";
 import { getDb, hasDatabase } from "@/lib/db";
 import {
@@ -409,12 +410,67 @@ function readTxnDimension(
 
 const GENERATED_ROW_CAP = 48;
 
+export type RenderGeneratedUiContext = {
+  chatId?: string;
+  knowledgeMode?: boolean;
+};
+
+function isKnowledgeSourceId(dataset: string) {
+  return dataset.startsWith("ks_");
+}
+
 export async function renderGeneratedUi(
   spec: GeneratedUiFilter,
+  ctx?: RenderGeneratedUiContext,
 ): Promise<GeneratedUiOutput> {
   const sanitized = sanitizeGeneratedCode(spec.code);
   if (!sanitized.ok) {
     return { ok: false, reason: sanitized.reason };
+  }
+
+  if (ctx?.knowledgeMode && !isKnowledgeSourceId(spec.dataset)) {
+    return {
+      ok: false,
+      reason:
+        "This thread uses your uploaded tables. Pass a source id (ks_...) as dataset.",
+    };
+  }
+
+  if (!ctx?.knowledgeMode && isKnowledgeSourceId(spec.dataset)) {
+    return {
+      ok: false,
+      reason: "No uploaded tables on this thread. Use monthly_pl or transactions.",
+    };
+  }
+
+  if (isKnowledgeSourceId(spec.dataset)) {
+    if (!ctx?.chatId) {
+      return { ok: false, reason: "Missing chat id for uploaded tables." };
+    }
+    const source = await getKnowledgeSource(ctx.chatId, spec.dataset);
+    if (!source) {
+      return {
+        ok: false,
+        reason: "Unknown table. Use one of the uploaded source ids.",
+      };
+    }
+    if (source.kind !== "table") {
+      return {
+        ok: false,
+        reason: "PDFs are not chartable. Use a CSV or Excel sheet.",
+      };
+    }
+    return {
+      ok: true,
+      code: sanitized.code,
+      data: {
+        dataset: "knowledge",
+        sourceId: source.id,
+        filename: source.filename,
+        columns: source.columns,
+        rows: source.rows.slice(0, GENERATED_ROW_CAP),
+      },
+    };
   }
 
   if (spec.dataset === "monthly_pl") {
@@ -430,16 +486,23 @@ export async function renderGeneratedUi(
     };
   }
 
-  const status = spec.status ?? "all";
-  let rows = await loadLedger();
-  if (status !== "all") rows = rows.filter((row) => row.status === status);
+  if (spec.dataset === "transactions") {
+    const status = spec.status ?? "all";
+    let rows = await loadLedger();
+    if (status !== "all") rows = rows.filter((row) => row.status === status);
+    return {
+      ok: true,
+      code: sanitized.code,
+      data: {
+        dataset: "transactions",
+        status,
+        rows: rows.slice(0, GENERATED_ROW_CAP),
+      },
+    };
+  }
+
   return {
-    ok: true,
-    code: sanitized.code,
-    data: {
-      dataset: "transactions",
-      status,
-      rows: rows.slice(0, GENERATED_ROW_CAP),
-    },
+    ok: false,
+    reason: "Unknown dataset. Use monthly_pl, transactions, or a source id.",
   };
 }

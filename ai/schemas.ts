@@ -252,6 +252,13 @@ export const generatedTransactionRowSchema = z.object({
   segment: z.string().nullable(),
 });
 
+export const knowledgeCellSchema = z.union([
+  z.string(),
+  z.number(),
+  z.boolean(),
+  z.null(),
+]);
+
 export const generatedUiDataSchema = z.discriminatedUnion("dataset", [
   z.object({
     dataset: z.literal("monthly_pl"),
@@ -263,10 +270,21 @@ export const generatedUiDataSchema = z.discriminatedUnion("dataset", [
     status: z.enum(["all", "Completed", "Pending"]).optional(),
     rows: z.array(generatedTransactionRowSchema).max(48),
   }),
+  z.object({
+    dataset: z.literal("knowledge"),
+    sourceId: z.string(),
+    filename: z.string(),
+    columns: z.array(z.string()),
+    rows: z.array(z.record(z.string(), knowledgeCellSchema)).max(48),
+  }),
 ]);
 
 export const generatedUiFilterSchema = z.object({
-  dataset: visualDatasetSchema,
+  dataset: z
+    .string()
+    .describe(
+      "monthly_pl | transactions, or a knowledge source id (ks_...) when this chat has uploaded tables.",
+    ),
   months: z
     .union([z.literal(3), z.literal(6), z.literal(12)])
     .optional()

@@ -84,7 +84,7 @@ export function GeneratedUiWidget({
   data,
   onRepair,
 }: GeneratedUiView & {
-  onRepair?: (stack: string, dataset: "monthly_pl" | "transactions") => void;
+  onRepair?: (stack: string, dataset: string) => void;
 }) {
   const [showCode, setShowCode] = useState(false);
   const [repairing, setRepairing] = useState(false);
@@ -108,9 +108,11 @@ export function GeneratedUiWidget({
       }
       attempts.current += 1;
       setRepairing(true);
-      onRepair?.(message, data.dataset);
+      const dataset =
+        data.dataset === "knowledge" ? data.sourceId : data.dataset;
+      onRepair?.(message, dataset);
     },
-    [data.dataset, fatal, onRepair, repairing],
+    [data, fatal, onRepair, repairing],
   );
 
   if (fatal) {
@@ -135,9 +137,11 @@ export function GeneratedUiWidget({
           <CardDescription>
             {repairing
               ? "Adjusting layout…"
-              : data.dataset === "monthly_pl"
-                ? "Monthly P&L from the warehouse"
-                : "Ledger rows from the warehouse"}
+              : data.dataset === "knowledge"
+                ? data.filename
+                : data.dataset === "monthly_pl"
+                  ? "Monthly P&L from the warehouse"
+                  : "Ledger rows from the warehouse"}
           </CardDescription>
         </div>
         <Button

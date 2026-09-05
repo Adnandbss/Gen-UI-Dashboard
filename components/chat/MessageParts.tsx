@@ -67,7 +67,7 @@ export function MessageParts({
   parts: ChatMessage["parts"];
   messageId: string;
   onAsk?: (prompt: string) => void;
-  onRepair?: (stack: string, dataset: "monthly_pl" | "transactions") => void;
+  onRepair?: (stack: string, dataset: string) => void;
 }) {
   return (
     <>
@@ -115,7 +115,7 @@ function renderPart(
   part: MessagePart,
   key: string,
   onAsk?: (prompt: string) => void,
-  onRepair?: (stack: string, dataset: "monthly_pl" | "transactions") => void,
+  onRepair?: (stack: string, dataset: string) => void,
 ) {
   switch (part.type) {
     case "text":

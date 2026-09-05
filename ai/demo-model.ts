@@ -125,3 +125,23 @@ export const demoModel = new MockLanguageModelV4({
     }),
   }),
 });
+
+const KNOWLEDGE_DEMO_TEXT =
+  "Your files are attached to this chat. Demo mode only scripts the Acme warehouse — add a model key in .env.local to generate charts from your tables.";
+
+export const knowledgeDemoModel = new MockLanguageModelV4({
+  doStream: async () => ({
+    stream: simulateReadableStream({
+      initialDelayInMs: 200,
+      chunkDelayInMs: 16,
+      chunks: [
+        ...textParts("demo-knowledge", KNOWLEDGE_DEMO_TEXT),
+        {
+          type: "finish",
+          finishReason: { unified: "stop", raw: undefined },
+          usage,
+        },
+      ],
+    }),
+  }),
+});

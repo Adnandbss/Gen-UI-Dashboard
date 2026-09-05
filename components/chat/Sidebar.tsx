@@ -11,6 +11,8 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 
+import { KnowledgeUploader } from "@/components/knowledge/KnowledgeUploader";
+import type { KnowledgeSummary } from "@/lib/knowledge/types";
 import { NAV_PROMPTS } from "@/lib/prompts";
 import { cn } from "@/lib/utils";
 
@@ -33,15 +35,19 @@ export function Sidebar({
   activeLabel = "Overview",
   currentChatId,
   recents = [],
+  knowledgeSources = [],
   onSelect,
   onClose,
+  onKnowledgeUploaded,
 }: {
   className?: string;
   activeLabel?: string;
   currentChatId?: string;
   recents?: RecentChat[];
+  knowledgeSources?: KnowledgeSummary[];
   onSelect?: (prompt: string, label?: string) => void;
   onClose?: () => void;
+  onKnowledgeUploaded?: () => void;
 }) {
   return (
     <aside
@@ -117,6 +123,12 @@ export function Sidebar({
             )}
           </div>
         </div>
+
+        <KnowledgeUploader
+          chatId={currentChatId}
+          sources={knowledgeSources}
+          onUploaded={onKnowledgeUploaded}
+        />
       </nav>
 
       <div className="flex items-center gap-3 border-t px-4 py-3">
