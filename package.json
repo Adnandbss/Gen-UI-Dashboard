@@ -16,6 +16,7 @@
     "@ai-sdk/google": "^4.0.64",
     "@ai-sdk/openai": "^4.0.58",
     "@ai-sdk/react": "^4.0.95",
+    "@codesandbox/sandpack-react": "^2.20.0",
     "@neondatabase/serverless": "^1.1.0",
     "ai": "^7.0.92",
     "class-variance-authority": "^0.7.1",

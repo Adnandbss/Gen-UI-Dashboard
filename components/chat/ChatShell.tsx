@@ -45,6 +45,7 @@ export function ChatShell({
   const [recents, setRecents] = useState<RecentChat[]>([]);
   const [copied, setCopied] = useState(false);
   const stickToBottom = useRef(true);
+  const silentRepairs = useRef(0);
 
   const { messages, sendMessage, status, stop, error, regenerate } =
     useChat<ChatMessage>({
@@ -100,9 +101,23 @@ export function ChatShell({
       if (!trimmed || isStreaming) return;
       if (navLabel) setActiveNav(navLabel);
       stickToBottom.current = true;
+      silentRepairs.current = 0;
       sendMessage({ text: trimmed });
       setInput("");
       setSidebarOpen(false);
+    },
+    [isStreaming, sendMessage],
+  );
+
+  const requestRepair = useCallback(
+    (stack: string, dataset: "monthly_pl" | "transactions") => {
+      if (isStreaming || silentRepairs.current >= 2) return;
+      silentRepairs.current += 1;
+      stickToBottom.current = true;
+      sendMessage({
+        text: `The generated component failed to render. Call show_generated_ui again with dataset "${dataset}" and the same filters. Put only the raw component source in code — no markdown fences. Do not invent numbers or use fetch. Runtime error:\n${stack.slice(0, 2000)}`,
+        metadata: { silent: true },
+      });
     },
     [isStreaming, sendMessage],
   );
@@ -250,6 +265,7 @@ export function ChatShell({
             >
               {messages.map((message) =>
                 message.role === "user" ? (
+                  message.metadata?.silent ? null : (
                   <div key={message.id} className="flex justify-end">
                     <div className="bg-secondary text-secondary-foreground max-w-[85%] rounded-2xl rounded-br-md px-4 py-2.5 text-[15px] leading-relaxed whitespace-pre-wrap">
                       {message.parts
@@ -258,6 +274,7 @@ export function ChatShell({
                         .join("")}
                     </div>
                   </div>
+                  )
                 ) : (
                   <div key={message.id} className="flex gap-3">
                     <span
@@ -271,6 +288,7 @@ export function ChatShell({
                         parts={message.parts}
                         messageId={message.id}
                         onAsk={submit}
+                        onRepair={requestRepair}
                       />
                     </div>
                   </div>

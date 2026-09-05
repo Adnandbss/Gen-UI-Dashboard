@@ -115,4 +115,55 @@ describe("demo planner filters", () => {
   it("turns a KPI drill-down into a revenue chart", () => {
     expect(toolsOf("Break down Net Revenue.")).toEqual(["show_revenue_chart"]);
   });
+
+  it("maps inflows by segment to a sandboxed view over warehouse rows", () => {
+    expect(toolsOf("Show inflows by segment.")).toEqual(["show_generated_ui"]);
+    const input = call("Show inflows by segment.", "show_generated_ui")?.input;
+    expect(input?.dataset).toBe("transactions");
+    expect(input?.code).toMatch(/PieChart/);
+    expect(input?.code).toMatch(/data\.rows/);
+  });
+
+  it("maps revenue by segment to the same generated pie", () => {
+    expect(toolsOf("Revenue by segment")).toEqual(["show_generated_ui"]);
+    expect(call("Revenue by segment", "show_generated_ui")?.input.dataset).toBe(
+      "transactions",
+    );
+  });
+
+  it("does not steal a churn-by-segment question for the pie", () => {
+    expect(call("How is churn looking by segment?", "show_kpi_metrics")?.input).toEqual({
+      kpiSet: "churn",
+    });
+    expect(toolsOf("How is churn looking by segment?")).toEqual(["show_kpi_metrics"]);
+  });
+
+  it("maps a segment drill-down prompt to show_generated_ui before the generic break-down chart", () => {
+    expect(toolsOf("Break down revenue by segment.")).toEqual(["show_generated_ui"]);
+  });
+
+  it("plots cash over time as generated UI on monthly_pl", () => {
+    expect(toolsOf("Show cash over time.")).toEqual(["show_generated_ui"]);
+    expect(call("Show cash over time.", "show_generated_ui")?.input).toMatchObject({
+      dataset: "monthly_pl",
+      months: 6,
+    });
+    expect(call("Show cash over time.", "show_generated_ui")?.input.code).toMatch(
+      /AreaChart/,
+    );
+  });
+
+  it("honours a 12-month chip on the cash area", () => {
+    expect(
+      call("Show cash over time for the last 12 months.", "show_generated_ui")?.input
+        .months,
+    ).toBe(12);
+  });
+
+  it("does not invent a visual for revenue by country", () => {
+    expect(toolsOf("Show revenue by country.")).toEqual([]);
+    expect(planDemoResponse("Show revenue by country.").intro).toMatch(
+      /country|segment|month/i,
+    );
+  });
 });

@@ -5,6 +5,7 @@ const nextConfig: NextConfig = {
   // Next 16 blocks JS/HMR for any host that isn't localhost. Allow this
   // machine's LAN addresses so opening the Network URL still hydrates.
   allowedDevOrigins: localNetworkHosts(),
+  transpilePackages: ["@codesandbox/sandpack-react"],
 };
 
 export default nextConfig;

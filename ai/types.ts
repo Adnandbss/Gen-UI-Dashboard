@@ -9,4 +9,6 @@ import type { chatTools } from "./tools";
  */
 export type ChatTools = InferUITools<typeof chatTools>;
 
-export type ChatMessage = UIMessage<unknown, never, ChatTools>;
+export type ChatMetadata = { silent?: boolean };
+
+export type ChatMessage = UIMessage<ChatMetadata, never, ChatTools>;

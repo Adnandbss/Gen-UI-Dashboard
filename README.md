@@ -24,12 +24,17 @@ Most "AI dashboard" demos are a chat box bolted onto a fixed page. This one
 inverts that: **the interface is the model's output.** The interesting work is in
 the contract between them.
 
-- **Query in, view out.** Tools take filters only (`months`, `status`, `kpiSet`).
-  `execute` loads a typed view model from Neon (or the in-repo seed). Widgets
-  parse `part.output` — they never paint invented JSON from `part.input`.
+- **Query in, view out.** Specialist tools take filters only (`months`, `status`, `kpiSet`). Custom views take a React source string plus those filters. `execute` loads rows from Neon (or the in-repo seed). Widgets parse `part.output` — they never paint invented JSON from `part.input`.
 - **The schema is the contract.** Filter schemas and view schemas live in
   [`ai/schemas.ts`](ai/schemas.ts). A tool and its component physically cannot
   drift apart.
+- **Isolated generated UI.** Custom charts compile inside a Sandpack iframe
+  (`@codesandbox/sandpack-react`) with Tailwind and Recharts preloaded. The
+  generated component receives warehouse rows as a `data` prop. It never runs
+  in Ledger's own DOM, never fetches, and never invents figures.
+- **Fail-closed cuts.** Country, cohort, and weekly are not in the warehouse.
+  The model must not draw them — not as a specialist chart, not as generated
+  JSX. The UI says what we actually have: month, segment, status.
 - **One seed, every surface.** Demo mode, a live model, and `npm run eval` all
   read the same Acme Capital figures. No API key, no `DATABASE_URL`, still the
   same August revenue.
@@ -51,7 +56,7 @@ the contract between them.
 | AI | Vercel AI SDK v7 · AI Gateway or OpenAI |
 | Data | Neon Postgres · Drizzle ORM · `@neondatabase/serverless` |
 | Validation | Zod 4 |
-| UI | Tailwind CSS v4 · shadcn/ui · Recharts 3 · lucide-react |
+| UI | Tailwind CSS v4 · shadcn/ui · Recharts 3 · lucide-react · Sandpack |
 
 ## Quick start
 
@@ -117,9 +122,11 @@ npm run db:push && npm run db:seed
 The same commands against production: `vercel env pull` then seed, or run them
 once with the production `DATABASE_URL`.
 
-## The four tools
+## The tools
 
-Each maps one-to-one onto a component in `components/widgets/`.
+Four specialist widgets cover the product-grade layouts. Custom charts and
+one-off UI go through `show_generated_ui`: the model writes a React component;
+`execute` attaches warehouse rows; Sandpack renders it in an iframe.
 
 | Tool | Renders | Filters |
 |---|---|---|
@@ -127,11 +134,18 @@ Each maps one-to-one onto a component in `components/widgets/`.
 | `show_revenue_chart` | `RevenueChartWidget` | `months`: 3 / 6 / 12 |
 | `show_transactions_list` | `TransactionsGridWidget` | `status`, optional `id` |
 | `show_runway` | `RunwayWidget` | `months`: 3 / 6 / 12 |
+| `show_generated_ui` | `GeneratedUiWidget` (Sandpack) | `dataset`, optional `months` / `status`, `code` — **never rows** |
+
+`code` must be raw `export default function View({ data })` source. The wrapper
+that injects `data` is written by us, not the model. If the source contains
+`fetch` or `eval`, `execute` returns a typed error. Runtime crashes in the
+iframe trigger up to two silent repair turns.
 
 A broad question like *"give me the full dashboard"* triggers KPIs, the
 revenue chart, and transactions in a single turn, followed by a written read
 on what the numbers mean. Asking about runway gets its own area chart — not a
-fourth KPI row.
+fourth KPI row. Asking for inflows by segment gets a generated pie over the
+ledger, not a hallucinated breakdown.
 
 ## How a message becomes UI
 
@@ -147,7 +161,8 @@ user question
        ├─ "tool-show_revenue_chart"    → skeleton → <RevenueChartWidget />
        ├─ "tool-show_transactions_list"→ skeleton → <TransactionsGridWidget />
        ├─ "tool-show_kpi_metrics"      → skeleton → <KpiCardsWidget />
-       └─ "tool-show_runway"           → skeleton → <RunwayWidget />
+       ├─ "tool-show_runway"           → skeleton → <RunwayWidget />
+       └─ "tool-show_generated_ui"     → skeleton → Sandpack iframe
 ```
 
 Raw tool arguments are never shown to the user — they only ever appear as
@@ -166,18 +181,20 @@ the thread. Don't paste real financials into a public demo.
 ## Project layout
 
 ```
-ai/
+  ai/
   schemas.ts         Filter + view Zod schemas (the contract)
   tools.ts           Query-in / view-out tools
   types.ts           InferUITools → typed ChatMessage
   prompt.ts          System prompt
+  generated-templates.ts  Demo-mode Chart.jsx sources
   demo-model.ts      Protocol-level mock model for demo mode
-  demo-data.ts       Keyword router → filters only
+  demo-data.ts       Keyword router → filters (+ canned code)
 db/
   schema.ts          Drizzle tables
   seed.ts            `npm run db:seed`
 lib/
   warehouse/         Query API + seed fallback
+  generated-ui/      Strip fences / forbid fetch
   chat-store.ts      chats + messages persistence
   rate-limit.ts      hashed IP, 20 / 10 minutes
 app/
@@ -187,10 +204,10 @@ app/
   api/chats/route.ts Recent list
 components/
   chat/ChatShell.tsx Shared UI for / and /c/[id]
-  widgets/           Four generative widgets + skeletons
+  widgets/           Product widgets + GeneratedUiWidget (Sandpack)
 evals/
-  warehouse.test.ts  Seed totals
-  planner.test.ts    ~15 prompt → filter mappings
+  warehouse.test.ts  Seed totals + generated-ui sanitize
+  planner.test.ts    Prompt → filter mappings (including fail-closed)
 ```
 
 ## Choosing a model

@@ -5,7 +5,10 @@ import {
   getRevenueSeries,
   getRunway,
   getTransactions,
+  queryVisual,
+  renderGeneratedUi,
 } from "@/lib/warehouse/queries";
+import { sanitizeGeneratedCode, stripMarkdownFences } from "@/lib/generated-ui/sanitize";
 import { MONTHLY_PL, TRANSACTIONS } from "@/lib/warehouse/seed-data";
 
 const last6 = MONTHLY_PL.slice(-6);
@@ -74,5 +77,117 @@ describe("warehouse seed totals", () => {
     expect(view.netBurn).toBe(august.netBurn);
     expect(view.monthsOfRunway).toBe(august.cash / august.netBurn);
     expect(view.data).toHaveLength(6);
+  });
+});
+
+describe("queryVisual catalog", () => {
+  it("groups positive segment inflows to match seed", async () => {
+    const view = await queryVisual({
+      dataset: "transactions",
+      mark: "pie",
+      x: "segment",
+      y: "amount",
+      yAgg: "sum",
+    });
+    expect(view.unsupported).toBe(false);
+    if (view.unsupported) return;
+
+    const expected = new Map<string, number>();
+    for (const row of TRANSACTIONS) {
+      if (row.amount <= 0 || !row.segment) continue;
+      expected.set(row.segment, (expected.get(row.segment) ?? 0) + row.amount);
+    }
+
+    expect(view.rows).toHaveLength(expected.size);
+    for (const [segment, total] of expected) {
+      expect(view.rows.find((row) => row.x === segment)?.y).toBe(total);
+    }
+  });
+
+  it("returns a cash series whose length matches the requested months", async () => {
+    const view = await queryVisual({
+      dataset: "monthly_pl",
+      mark: "area",
+      x: "label",
+      y: "cash",
+      yAgg: "sum",
+      months: 6,
+    });
+    expect(view.unsupported).toBe(false);
+    if (view.unsupported) return;
+    expect(view.rows).toHaveLength(6);
+    expect(view.months).toBe(6);
+    expect(view.rows.map((row) => row.y)).toEqual(
+      MONTHLY_PL.slice(-6).map((row) => row.cash),
+    );
+  });
+
+  it("rejects unknown fields and datasets the catalog cannot answer", async () => {
+    const country = await queryVisual({
+      dataset: "monthly_pl",
+      mark: "bar",
+      x: "country",
+      y: "revenue",
+      yAgg: "sum",
+    });
+    expect(country).toMatchObject({ unsupported: true });
+    if (!country.unsupported) return;
+    expect(country.reason).toMatch(/country|dimension/i);
+
+    const weekly = await queryVisual({
+      dataset: "transactions",
+      mark: "line",
+      x: "segment",
+      y: "weekly",
+      yAgg: "sum",
+    });
+    expect(weekly.unsupported).toBe(true);
+  });
+});
+
+describe("generated UI sanitize and warehouse data", () => {
+  it("strips markdown fences from model source", () => {
+    expect(stripMarkdownFences("```jsx\nexport default function View() {}\n```")).toBe(
+      "export default function View() {}",
+    );
+  });
+
+  it("rejects fetch, eval, and sockets in generated source", () => {
+    expect(sanitizeGeneratedCode("export default function View() { fetch('/api') }").ok).toBe(
+      false,
+    );
+    expect(sanitizeGeneratedCode("export default function View({ data }) { return null }").ok).toBe(
+      true,
+    );
+  });
+
+  it("injects warehouse rows and ignores any numbers in the source", async () => {
+    const view = await renderGeneratedUi({
+      dataset: "transactions",
+      code: "```jsx\nexport default function View({ data }) { return data.rows.length }\n```",
+    });
+    expect(view.ok).toBe(true);
+    if (!view.ok) return;
+    expect(view.data.dataset).toBe("transactions");
+    if (view.data.dataset !== "transactions") return;
+    expect(view.data.rows).toHaveLength(TRANSACTIONS.length);
+    expect(view.data.rows[0]?.amount).toBe(TRANSACTIONS[0]?.amount);
+    expect(view.code).not.toMatch(/```/);
+  });
+
+  it("returns a cash series whose length matches the requested months", async () => {
+    const view = await renderGeneratedUi({
+      dataset: "monthly_pl",
+      months: 6,
+      code: "export default function View({ data }) { return null }",
+    });
+    expect(view.ok).toBe(true);
+    if (!view.ok) return;
+    expect(view.data.dataset).toBe("monthly_pl");
+    if (view.data.dataset !== "monthly_pl") return;
+    expect(view.data.rows).toHaveLength(6);
+    expect(view.data.rows.map((row) => row.cash)).toEqual(
+      MONTHLY_PL.slice(-6).map((row) => row.cash),
+    );
   });
 });

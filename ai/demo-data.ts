@@ -1,10 +1,12 @@
 import type {
+  GeneratedUiFilter,
   KpiSet,
   MonthsFilter,
   RevenueChartFilter,
   RunwayFilter,
   TransactionsListFilter,
 } from "./schemas";
+import { CASH_AREA_CODE, SEGMENT_PIE_CODE } from "./generated-templates";
 
 /**
  * Keyword router for demo mode. It only decides *which filters to request*;
@@ -15,7 +17,8 @@ export type DemoToolCall =
   | { toolName: "show_revenue_chart"; input: RevenueChartFilter }
   | { toolName: "show_transactions_list"; input: TransactionsListFilter }
   | { toolName: "show_kpi_metrics"; input: { kpiSet: KpiSet } }
-  | { toolName: "show_runway"; input: RunwayFilter };
+  | { toolName: "show_runway"; input: RunwayFilter }
+  | { toolName: "show_generated_ui"; input: GeneratedUiFilter };
 
 export type DemoPlan = {
   intro: string;
@@ -94,6 +97,79 @@ export function planDemoResponse(userText: string): DemoPlan {
       ],
       closing:
         "This is the named ledger line — click another row if you want the same treatment for a different payment.",
+    };
+  }
+
+  if (matches(text, /generated component failed/)) {
+    const monthly = matches(text, /monthly_pl/);
+    return {
+      intro: "Retrying the custom view.",
+      toolCalls: [
+        monthly
+          ? {
+              toolName: "show_generated_ui",
+              input: {
+                dataset: "monthly_pl",
+                months: 6,
+                code: CASH_AREA_CODE,
+              },
+            }
+          : {
+              toolName: "show_generated_ui",
+              input: {
+                dataset: "transactions",
+                code: SEGMENT_PIE_CODE,
+              },
+            },
+      ],
+      closing: "Layout is rebuilt from the same warehouse rows.",
+    };
+  }
+
+  if (matches(text, /\bcountr(?:y|ies)\b|\bcohorts?\b|\bweekly\b/)) {
+    return {
+      intro:
+        "We don't have country, cohort, or weekly cuts — only month, segment, and status. Ask for inflows by segment or cash over time and I can draw those from the ledger.",
+      toolCalls: [],
+      closing: "",
+    };
+  }
+
+  if (matches(text, /by segment|inflows by segment/) && !matches(text, /churn/)) {
+    return {
+      intro: "Grouping ledger inflows by segment.",
+      toolCalls: [
+        {
+          toolName: "show_generated_ui",
+          input: {
+            dataset: "transactions",
+            code: SEGMENT_PIE_CODE,
+          },
+        },
+      ],
+      closing:
+        "Enterprise and Manufacturing are the large completed inflows; Ops and People are outflows, so they do not appear as pie slices.",
+    };
+  }
+
+  if (
+    matches(text, /cash over time|cash over the last|ending cash over|cash as an area/) &&
+    !matches(text, /runway/)
+  ) {
+    return {
+      intro: "Plotting ending cash from the monthly P&L.",
+      toolCalls: [
+        {
+          toolName: "show_generated_ui",
+          input: {
+            dataset: "monthly_pl",
+            months,
+            code: CASH_AREA_CODE,
+          },
+        },
+      ],
+      closing:
+        "Cash is still declining, but the slope flattened in August as net burn came in lower.",
     };
   }
 
@@ -210,6 +286,11 @@ function buildClosing(toolCalls: DemoToolCall[], pendingOnly: boolean): string {
   if (rendered.has("show_runway")) {
     notes.push(
       "Cash is still declining, but slower — August burn is what stretched runway, not a financing event.",
+    );
+  }
+  if (rendered.has("show_generated_ui")) {
+    notes.push(
+      "This view is warehouse rows running in an isolated layout — if a cut is missing, it is because we do not have that field.",
     );
   }
   if (rendered.has("show_transactions_list")) {

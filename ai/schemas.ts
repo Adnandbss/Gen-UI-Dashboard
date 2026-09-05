@@ -49,6 +49,81 @@ export const runwayFilterSchema = z.object({
 });
 
 /* -------------------------------------------------------------------------- */
+/*  show_visual — grammar spec (query in)                                     */
+/* -------------------------------------------------------------------------- */
+
+export const visualDatasetSchema = z
+  .enum(["monthly_pl", "transactions"])
+  .describe(
+    "monthly_pl = month-level P&L and cash; transactions = ledger lines with segment and status.",
+  );
+
+export const visualMarkSchema = z
+  .enum(["bar", "grouped_bar", "line", "area", "pie"])
+  .describe("Chart mark. grouped_bar needs a series field.");
+
+export const visualAggSchema = z
+  .enum(["sum", "avg", "count"])
+  .default("sum")
+  .describe(
+    "Aggregation for y. Use count with y=id on transactions. Monthly fields are already one row per month.",
+  );
+
+export const visualFilterSchema = z.object({
+  dataset: visualDatasetSchema,
+  mark: visualMarkSchema,
+  x: z
+    .string()
+    .describe(
+      "Category/dimension from the catalog: label (monthly_pl) or segment | status (transactions).",
+    ),
+  y: z
+    .string()
+    .describe(
+      "Measure from the catalog: revenue | expenses | cash | netBurn, or amount | id on transactions.",
+    ),
+  yAgg: visualAggSchema,
+  series: z
+    .string()
+    .optional()
+    .describe("Optional split, e.g. status or segment on transactions."),
+  months: z
+    .union([z.literal(3), z.literal(6), z.literal(12)])
+    .optional()
+    .describe("Trailing months for monthly_pl. Omit for transactions."),
+  status: z
+    .enum(["all", "Completed", "Pending"])
+    .optional()
+    .describe("Optional settlement filter on transactions."),
+  title: z.string().optional(),
+  subtitle: z.string().optional(),
+});
+
+export const visualRowSchema = z.object({
+  x: z.string(),
+  y: z.number(),
+  series: z.string().optional(),
+});
+
+export const visualOutputSchema = z.discriminatedUnion("unsupported", [
+  z.object({
+    unsupported: z.literal(true),
+    reason: z.string(),
+  }),
+  z.object({
+    unsupported: z.literal(false),
+    title: z.string().optional(),
+    subtitle: z.string().optional(),
+    mark: visualMarkSchema,
+    xKey: z.string(),
+    yKey: z.string(),
+    seriesKey: z.string().optional(),
+    months: z.union([z.literal(3), z.literal(6), z.literal(12)]).optional(),
+    rows: z.array(visualRowSchema).max(48),
+  }),
+]);
+
+/* -------------------------------------------------------------------------- */
 /*  View models — what execute returns and widgets render                     */
 /* -------------------------------------------------------------------------- */
 
@@ -155,6 +230,70 @@ export const runwaySchema = z.object({
     .describe("Cash series, oldest to newest."),
 });
 
+/* -------------------------------------------------------------------------- */
+/*  show_generated_ui — React source in, warehouse rows out                   */
+/* -------------------------------------------------------------------------- */
+
+export const generatedMonthlyRowSchema = z.object({
+  month: z.string(),
+  label: z.string(),
+  revenue: z.number(),
+  expenses: z.number(),
+  cash: z.number(),
+  netBurn: z.number(),
+});
+
+export const generatedTransactionRowSchema = z.object({
+  id: z.string(),
+  date: z.string(),
+  description: z.string(),
+  amount: z.number(),
+  status: transactionStatusSchema,
+  segment: z.string().nullable(),
+});
+
+export const generatedUiDataSchema = z.discriminatedUnion("dataset", [
+  z.object({
+    dataset: z.literal("monthly_pl"),
+    months: z.union([z.literal(3), z.literal(6), z.literal(12)]),
+    rows: z.array(generatedMonthlyRowSchema).max(48),
+  }),
+  z.object({
+    dataset: z.literal("transactions"),
+    status: z.enum(["all", "Completed", "Pending"]).optional(),
+    rows: z.array(generatedTransactionRowSchema).max(48),
+  }),
+]);
+
+export const generatedUiFilterSchema = z.object({
+  dataset: visualDatasetSchema,
+  months: z
+    .union([z.literal(3), z.literal(6), z.literal(12)])
+    .optional()
+    .describe("Trailing months for monthly_pl. Omit for transactions."),
+  status: z
+    .enum(["all", "Completed", "Pending"])
+    .optional()
+    .describe("Optional settlement filter on transactions."),
+  code: z
+    .string()
+    .describe(
+      "Raw React source only: export default function View({ data }) { ... }. No markdown fences, no fetch, no invented numbers. Read data.rows.",
+    ),
+});
+
+export const generatedUiOutputSchema = z.discriminatedUnion("ok", [
+  z.object({
+    ok: z.literal(false),
+    reason: z.string(),
+  }),
+  z.object({
+    ok: z.literal(true),
+    code: z.string(),
+    data: generatedUiDataSchema,
+  }),
+]);
+
 export type MonthsFilter = 3 | 6 | 12;
 export type RevenueChartFilter = z.infer<typeof revenueChartFilterSchema>;
 export type TransactionsListFilter = z.infer<typeof transactionsListFilterSchema>;
@@ -174,3 +313,14 @@ export type KpiMetricsInput = z.infer<typeof kpiMetricsSchema>;
 
 export type RunwayDatum = z.infer<typeof runwayDatumSchema>;
 export type RunwayInput = z.infer<typeof runwaySchema>;
+
+export type VisualFilter = z.infer<typeof visualFilterSchema>;
+export type VisualMark = z.infer<typeof visualMarkSchema>;
+export type VisualRow = z.infer<typeof visualRowSchema>;
+export type VisualOutput = z.infer<typeof visualOutputSchema>;
+export type VisualView = Extract<VisualOutput, { unsupported: false }>;
+
+export type GeneratedUiFilter = z.infer<typeof generatedUiFilterSchema>;
+export type GeneratedUiData = z.infer<typeof generatedUiDataSchema>;
+export type GeneratedUiOutput = z.infer<typeof generatedUiOutputSchema>;
+export type GeneratedUiView = Extract<GeneratedUiOutput, { ok: true }>;

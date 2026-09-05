@@ -6,6 +6,7 @@ import type { ReactNode } from "react";
 
 import type { ChatMessage } from "@/ai/types";
 import {
+  generatedUiOutputSchema,
   kpiMetricsSchema,
   revenueChartSchema,
   runwaySchema,
@@ -14,6 +15,7 @@ import {
 import { KpiCardsWidget } from "@/components/widgets/KpiCardsWidget";
 import { TransactionsGridWidget } from "@/components/widgets/TransactionsGridWidget";
 import {
+  GeneratedUiSkeleton,
   KpiCardsSkeleton,
   RevenueChartSkeleton,
   RunwaySkeleton,
@@ -34,6 +36,14 @@ const RunwayWidget = dynamic(
   { ssr: false, loading: () => <RunwaySkeleton /> },
 );
 
+const GeneratedUiWidget = dynamic(
+  () =>
+    import("@/components/widgets/GeneratedUiWidget").then(
+      (mod) => mod.GeneratedUiWidget,
+    ),
+  { ssr: false, loading: () => <GeneratedUiSkeleton /> },
+);
+
 type MessagePart = ChatMessage["parts"][number];
 
 export function ToolError({ message }: { message: string }) {
@@ -52,15 +62,17 @@ export function MessageParts({
   parts,
   messageId,
   onAsk,
+  onRepair,
 }: {
   parts: ChatMessage["parts"];
   messageId: string;
   onAsk?: (prompt: string) => void;
+  onRepair?: (stack: string, dataset: "monthly_pl" | "transactions") => void;
 }) {
   return (
     <>
       {parts.map((part, index) =>
-        renderPart(part, `${messageId}-${index}`, onAsk),
+        renderPart(part, `${messageId}-${index}`, onAsk, onRepair),
       )}
     </>
   );
@@ -103,6 +115,7 @@ function renderPart(
   part: MessagePart,
   key: string,
   onAsk?: (prompt: string) => void,
+  onRepair?: (stack: string, dataset: "monthly_pl" | "transactions") => void,
 ) {
   switch (part.type) {
     case "text":
@@ -171,6 +184,25 @@ function renderPart(
             widget={(() => {
               const parsed = parseOutput(part, runwaySchema);
               return parsed ? <RunwayWidget {...parsed} onAsk={onAsk} /> : null;
+            })()}
+            errorText={"errorText" in part ? part.errorText : undefined}
+          />
+        </div>
+      );
+
+    case "tool-show_generated_ui":
+      return (
+        <div key={key}>
+          <ToolFrame
+            state={part.state}
+            skeleton={<GeneratedUiSkeleton />}
+            widget={(() => {
+              const parsed = parseOutput(part, generatedUiOutputSchema);
+              if (!parsed) return null;
+              if (!parsed.ok) {
+                return <ToolError message={parsed.reason} />;
+              }
+              return <GeneratedUiWidget {...parsed} onRepair={onRepair} />;
             })()}
             errorText={"errorText" in part ? part.errorText : undefined}
           />

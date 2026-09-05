@@ -16,7 +16,7 @@ import { isChatId } from "@/lib/chat-id";
 import { saveChat } from "@/lib/chat-store";
 import { clientIp, enforceRateLimit } from "@/lib/rate-limit";
 
-export const maxDuration = 30;
+export const maxDuration = 60;
 export const dynamic = "force-dynamic";
 
 const DEFAULT_OPENAI_MODEL = "openai/gpt-5.6-sol";

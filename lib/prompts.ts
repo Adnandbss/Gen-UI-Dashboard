@@ -130,11 +130,16 @@ export function followUpsFor(userText: string): PromptChip[] {
 }
 
 export function lastUserText(
-  messages: { role: string; parts: { type: string; text?: string }[] }[],
+  messages: {
+    role: string;
+    metadata?: { silent?: boolean };
+    parts: { type: string; text?: string }[];
+  }[],
 ): string {
   for (let i = messages.length - 1; i >= 0; i--) {
     const message = messages[i];
     if (message.role !== "user") continue;
+    if (message.metadata?.silent) continue;
     return message.parts
       .filter((part) => part.type === "text")
       .map((part) => part.text ?? "")

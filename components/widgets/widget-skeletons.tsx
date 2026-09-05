@@ -94,6 +94,43 @@ export function KpiCardsSkeleton() {
   );
 }
 
+export function GeneratedUiSkeleton() {
+  return (
+    <Card className="w-full">
+      <CardHeader className="flex flex-row items-start justify-between gap-4">
+        <div className="space-y-2">
+          <Skeleton className="h-4 w-36" />
+          <Skeleton className="h-3 w-48" />
+        </div>
+        <Skeleton className="h-8 w-16" />
+      </CardHeader>
+      <CardContent>
+        <Skeleton className="h-[360px] w-full rounded-lg" />
+      </CardContent>
+    </Card>
+  );
+}
+
+export function GenericVisualSkeleton() {
+  return (
+    <Card className="w-full">
+      <CardHeader className="flex flex-row items-start justify-between gap-4">
+        <div className="space-y-2">
+          <Skeleton className="h-4 w-40" />
+          <Skeleton className="h-3 w-28" />
+        </div>
+        <div className="flex flex-col items-end gap-2">
+          <Skeleton className="h-6 w-24" />
+          <Skeleton className="h-3 w-20" />
+        </div>
+      </CardHeader>
+      <CardContent>
+        <Skeleton className="h-[280px] w-full rounded-lg" />
+      </CardContent>
+    </Card>
+  );
+}
+
 export function RunwaySkeleton() {
   return (
     <Card className="w-full">

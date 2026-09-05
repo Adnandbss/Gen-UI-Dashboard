@@ -1,6 +1,7 @@
 import { tool } from "ai";
 
 import {
+  generatedUiFilterSchema,
   kpiMetricsFilterSchema,
   revenueChartFilterSchema,
   runwayFilterSchema,
@@ -11,6 +12,7 @@ import {
   getRevenueSeries,
   getRunway,
   getTransactions,
+  renderGeneratedUi,
 } from "@/lib/warehouse/queries";
 
 /**
@@ -45,6 +47,13 @@ export const chatTools = {
       "Render a cash runway chart (ending cash over time plus months-of-runway callout). Use when the user asks about runway, cash on hand, or how long the business can operate at current burn.",
     inputSchema: runwayFilterSchema,
     execute: async ({ months }) => getRunway({ months }),
+  }),
+
+  show_generated_ui: tool({
+    description:
+      "Render a custom React view in an isolated sandbox for charts the specialist tools do not cover (pie by segment, cash as an area, counts by status, one-off layouts). Pass dataset plus raw component source in `code`. Rows are loaded from the warehouse and injected as the `data` prop — never put numbers or fetch in `code`. Prefer a specialist tool when it matches. If the warehouse has no such cut (country, cohort, weekly), do not call this tool.",
+    inputSchema: generatedUiFilterSchema,
+    execute: async (spec) => renderGeneratedUi(spec),
   }),
 };
 
